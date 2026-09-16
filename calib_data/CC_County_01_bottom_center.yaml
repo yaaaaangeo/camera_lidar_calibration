@@ -1,0 +1,350 @@
+name: CC_County_01_bottom_center
+bag_paths:
+- /mnt/ssd990/Calibration/camera_lidar_calibration/CC_County_01/camera_lidar_cal_128.bag
+lidar_topic: /sensor/lidar/merge/ground_points
+camera_topic: /sensor/camera/bottom_center/compressed
+camera:
+  fx: 872.86412285
+  fy: 880.59765471
+  cx: 967.96687449
+  cy: 744.88049896
+  k1: 0.17333309
+  k2: -0.14917469
+  p1: -0.00030733
+  p2: -0.00048846
+  k3: -0.00523559
+  k4: 0.53384291
+  k5: -0.1753429
+  k6: -0.03560813
+target:
+  marker_size: 0.2
+  delta_width_qr_center: 0.55
+  delta_height_qr_center: 0.35
+  delta_width_circles: 0.5
+  delta_height_circles: 0.4
+  circle_radius: 0.12
+scenes:
+- id: s01
+  t_ns: 1787823560671624330
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 8.009519452000008
+    x_max: 9.842282800299914
+    y_min: -6.817424428180873
+    y_max: -5.477349230506814
+    z_min: 0.6388119615036674
+    z_max: 0.7588119615036673
+    yaw: -98.09263680649498
+    pitch: -0.0
+    roll: 91.43165034768398
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s02
+  t_ns: 1787823566777240640
+  bag: camera_lidar_cal_128.bag
+  frames: 5
+  filter:
+    x_min: 7.825
+    x_max: 9.515
+    y_min: -6.98
+    y_max: -5.48
+    z_min: 0.685
+    z_max: 0.855
+    yaw: -132.1
+    pitch: 0.0
+    roll: 88.8
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s03
+  t_ns: 1787823580137350857
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 7.720000000000001
+    x_max: 9.6
+    y_min: -7.0
+    y_max: -5.359999999999999
+    z_min: 1.26
+    z_max: 1.3800000000000001
+    yaw: -133.1
+    pitch: 0.0
+    roll: 89.6
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s04
+  t_ns: 1787823588373898875
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 8.165000000000001
+    x_max: 9.815
+    y_min: -1.33
+    y_max: 0.030000000000000027
+    z_min: 0.81
+    z_max: 0.9299999999999999
+    yaw: -95.3
+    pitch: 0.0
+    roll: 87.0
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s05
+  t_ns: 1787823595445601081
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 8.07492284840467
+    x_max: 9.838019546411436
+    y_min: -1.3362309223494777
+    y_max: -0.026442712286352532
+    z_min: 1.2135935102907731
+    z_max: 1.3335935102907732
+    yaw: -99.1074149174172
+    pitch: -0.0
+    roll: 87.96293856180422
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s06
+  t_ns: 1787823606006666451
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 8.005854018485438
+    x_max: 9.882317164341137
+    y_min: -1.3426499830522687
+    y_max: -0.009389701117879401
+    z_min: 1.5245625284698963
+    z_max: 1.6445625284698964
+    yaw: -99.44631506894854
+    pitch: -0.0
+    roll: 87.14314090416418
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s07
+  t_ns: 1787823617964264449
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 7.775364864232767
+    x_max: 9.496976023725466
+    y_min: 2.3071059225406456
+    y_max: 3.7017775211948845
+    z_min: 0.838835494684399
+    z_max: 0.9588354946843991
+    yaw: -30.922436982213128
+    pitch: -0.0
+    roll: 96.85147375207605
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s08
+  t_ns: 1787823627947683959
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 7.201658251091773
+    x_max: 8.911482203137838
+    y_min: 1.9606426588546724
+    y_max: 3.3291143481597025
+    z_min: 1.2465458658812199
+    z_max: 1.36654586588122
+    yaw: -58.062717900781806
+    pitch: -0.0
+    roll: 89.95850605784386
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s09
+  t_ns: 1787823633018595004
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 7.256956345975917
+    x_max: 8.91739248125924
+    y_min: 1.8514496791381245
+    y_max: 3.385304580680969
+    z_min: 1.53280390612416
+    z_max: 1.6528039061241602
+    yaw: -56.64963373341779
+    pitch: -0.0
+    roll: 88.68434988869505
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s10
+  t_ns: 1787823649348124560
+  bag: camera_lidar_cal_128.bag
+  frames: 5
+  filter:
+    x_min: 12.061292176664075
+    x_max: 13.693975832191533
+    y_min: 2.6435712299547047
+    y_max: 3.9255549376275205
+    z_min: 0.8770189344598334
+    z_max: 0.9970189344598335
+    yaw: -65.5750832981609
+    pitch: -0.0
+    roll: 88.7099767524249
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s11
+  t_ns: 1787823656909075586
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 11.925
+    x_max: 13.735
+    y_min: 2.3800000000000003
+    y_max: 4.1000000000000005
+    z_min: 0.9950000000000001
+    z_max: 1.165
+    yaw: -65.1
+    pitch: 0.0
+    roll: 89.8
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s12
+  t_ns: 1787823668086349024
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 12.001802705361133
+    x_max: 13.743345711324437
+    y_min: 2.618619797477208
+    y_max: 3.7973411138693547
+    z_min: 1.574363944395809
+    z_max: 1.6943639443958092
+    yaw: -66.98000805699944
+    pitch: -0.0
+    roll: 89.56771698210945
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s13
+  t_ns: 1787823681327505233
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 13.315
+    x_max: 15.125000000000002
+    y_min: -1.4399999999999997
+    y_max: -0.06000000000000005
+    z_min: 0.33499999999999985
+    z_max: 1.005
+    yaw: -90.0
+    pitch: 0.0
+    roll: 87.2
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s14
+  t_ns: 1787823690329176334
+  bag: camera_lidar_cal_128.bag
+  frames: 2
+  filter:
+    x_min: 13.404267953851612
+    x_max: 15.020021675957448
+    y_min: -1.3116865239763031
+    y_max: -0.1715322264593394
+    z_min: 1.2488586127321826
+    z_max: 1.3688586127321827
+    yaw: -95.56148212153354
+    pitch: -0.0
+    roll: 85.31314151799951
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s15
+  t_ns: 1787823698161934282
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 13.354141227562248
+    x_max: 15.054898571412998
+    y_min: -1.410607668117296
+    y_max: -0.04579485843247344
+    z_min: 1.5644935018098103
+    z_max: 1.6844935018098104
+    yaw: -96.79590451116772
+    pitch: -0.0
+    roll: 91.20044554843109
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s16
+  t_ns: 1787823709536552649
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 11.938959881832208
+    x_max: 13.94849857413627
+    y_min: -5.798105257670931
+    y_max: -4.2187327965649235
+    z_min: 0.7787562049250896
+    z_max: 0.8987562049250897
+    yaw: -119.48998816774245
+    pitch: -0.0
+    roll: 83.86709065640743
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s17
+  t_ns: 1787823719951766097
+  bag: camera_lidar_cal_128.bag
+  frames: 1
+  filter:
+    x_min: 11.835
+    x_max: 13.985
+    y_min: -5.9399999999999995
+    y_max: -4.24
+    z_min: 0.9450000000000001
+    z_max: 1.215
+    yaw: -122.3
+    pitch: 0.0
+    roll: 82.3
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s18
+  t_ns: 1787823727196025025
+  bag: camera_lidar_cal_128.bag
+  frames: 3
+  filter:
+    x_min: 11.904969180455257
+    x_max: 13.849767429053394
+    y_min: -6.049998146039187
+    y_max: -4.186665400149791
+    z_min: 1.5439051258998766
+    z_max: 1.6639051258998767
+    yaw: -121.65963744925898
+    pitch: -0.0
+    roll: 88.61867025637622
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true

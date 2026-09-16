@@ -1,0 +1,37 @@
+# camera <- lidar extrinsic
+vehicle: CC_County_01_bottom_center
+calibrated_on: 2026-08-27
+bags:
+  - camera_lidar_cal_128.bag
+lidar_topic: /sensor/lidar/merge/ground_points
+camera_topic: /sensor/camera/bottom_center/compressed
+detector: occupancy
+rmse_mm: 64.414
+scenes: 11
+correspondences: 44
+
+T_cam_lidar:
+  rows: 4
+  cols: 4
+  data: [
+     -0.02075818,  -0.99902341,   0.03900417,  -0.15738418,
+      0.22319610,  -0.04265861,  -0.97383969,   0.42616067,
+      0.97455251,  -0.01150956,   0.22386365,  -5.27606648,
+      0.00000000,   0.00000000,   0.00000000,   1.00000000
+  ]
+
+translation_m: [-0.157384, 0.426161, -5.276066]
+rotation_matrix:
+  - [ -0.02075818,  -0.99902341,   0.03900417]
+  - [  0.22319610,  -0.04265861,  -0.97383969]
+  - [  0.97455251,  -0.01150956,   0.22386365]
+
+camera:
+  fx: 872.86412285
+  fy: 880.59765471
+  cx: 967.96687449
+  cy: 744.88049896
+  distortion_model: rational_polynomial
+  # k1, k2, p1, p2, k3, k4, k5, k6
+  distortion: [0.1733330900, -0.1491746900, -0.0003073300, -0.0004884600, -0.0052355900, 0.5338429100, -0.1753429000, -0.0356081300]
+  # target hole radius: 120.00 mm

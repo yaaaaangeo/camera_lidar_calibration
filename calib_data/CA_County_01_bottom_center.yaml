@@ -1,0 +1,149 @@
+name: CA_County_01_bottom_center
+bag_paths:
+- /mnt/ssd990/Calibration/camera_lidar_calibration/CA_County_01/CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+lidar_topic: /sensor/lidar/merge/ground_points
+camera_topic: /sensor/camera/bottom_center/compressed
+camera:
+  fx: 909.02985013
+  fy: 908.7864307
+  cx: 937.59143638
+  cy: 779.38051307
+  k1: -0.25862002
+  k2: 0.05286346
+  p1: -0.00163891
+  p2: 0.00090263
+  k3: -0.00409366
+target:
+  marker_size: 0.1188
+  delta_width_qr_center: 0.3267
+  delta_height_qr_center: 0.2079
+  delta_width_circles: 0.297
+  delta_height_circles: 0.2376
+  circle_radius: 0.07128
+scenes:
+- id: s01
+  t_ns: 1787192448692920337
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.149123569781663
+    x_max: 8.144187452440955
+    y_min: -4.233362548992094
+    y_max: -3.3988500182519017
+    z_min: 2.025822095739009
+    z_max: 2.145822095739009
+    yaw: -120.71158582774048
+    pitch: -0.0
+    roll: 94.03235160328938
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s02
+  t_ns: 1787192465293050143
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.235761348599759
+    x_max: 8.23847872403438
+    y_min: -4.301113865810985
+    y_max: -3.507690322633125
+    z_min: 2.057054821302394
+    z_max: 2.177054821302394
+    yaw: -122.13675051533826
+    pitch: -0.0
+    roll: 79.13507734245088
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s03
+  t_ns: 1787192480893402982
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.674749056394808
+    x_max: 8.67542989201465
+    y_min: -0.6526391600390787
+    y_max: 0.2777469844216095
+    z_min: 2.001753078884931
+    z_max: 2.121753078884931
+    yaw: -90.6770996017142
+    pitch: -0.0
+    roll: 106.53562292516186
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s04
+  t_ns: 1787192482360055276
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.771941634911377
+    x_max: 8.764043181053166
+    y_min: -0.565320872337935
+    y_max: 0.2692932509488717
+    z_min: 2.077475233155823
+    z_max: 2.197475233155823
+    yaw: -93.91350454356981
+    pitch: -0.0
+    roll: 89.97553554306197
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s06
+  t_ns: 1787192476993196533
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.867323970799472
+    x_max: 8.900894640027165
+    y_min: -0.6259919813368875
+    y_max: 0.2018582583030935
+    z_min: 1.9799244356221029
+    z_max: 2.099924435622103
+    yaw: -90.79205101954325
+    pitch: -0.0
+    roll: 77.56468823198855
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s05
+  t_ns: 1787192496993360686
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.160475700592299
+    x_max: 8.190600481828188
+    y_min: 2.4394453632691713
+    y_max: 3.4134952078037566
+    z_min: 2.045546521253998
+    z_max: 2.165546521253998
+    yaw: -54.9928317416726
+    pitch: -0.0
+    roll: 87.94063337281852
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s07
+  t_ns: 1787192498960503925
+  bag: CA_County_01_cameralidarcalib_128_2026-08-20-11-20-34.bag
+  frames: 1
+  filter:
+    x_min: 7.150557199043516
+    x_max: 8.17667573824304
+    y_min: 2.5600810752856384
+    y_max: 3.3918192839970773
+    z_min: 2.092338010022625
+    z_max: 2.2123380100226253
+    yaw: -52.722278856957494
+    pitch: -0.0
+    roll: 73.61303266946607
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true

@@ -1,0 +1,25 @@
+# 자주 쓰는 캘리브레이션 보드 규격 (단위: m).
+#
+# GUI 3단계 드롭다운에 그대로 나온다. 여기에 직접 추가해도 되고,
+# GUI 에서 값을 넣은 뒤 "현재 값을 저장"을 눌러도 된다.
+#
+# 저장소에 커밋되므로 다른 머신에서도 같은 목록이 보인다.
+
+targets:
+  - name: 원본 CAD
+    note: FAST-Calib 기본 도면
+    marker_size: 0.20
+    delta_width_qr_center: 0.55
+    delta_height_qr_center: 0.35
+    delta_width_circles: 0.50
+    delta_height_circles: 0.40
+    circle_radius: 0.12
+
+  - name: 데모 보드 (0.594배)
+    note: 원본 CAD 를 0.594 배로 축소 출력한 것. 구멍 지름 142.6 mm
+    marker_size: 0.1188
+    delta_width_qr_center: 0.3267
+    delta_height_qr_center: 0.2079
+    delta_width_circles: 0.2970
+    delta_height_circles: 0.2376
+    circle_radius: 0.07128

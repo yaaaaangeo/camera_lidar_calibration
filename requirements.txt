@@ -1,0 +1,45 @@
+# camera_lidar_calibration GUI 의존성 (gui/app.py 및 gui/check_*.py).
+# 두 조합을 함께 지원: x86_64 + Python 3.10 (개발), Jetson Orin(aarch64) +
+# Python 3.8 (JetPack ROS Noetic 기본값에 맞춘 의도적인 선택 - 자세한 내용은
+# gui/README.md "실행 환경"). ROS는 필요 없다 - rosbags가 순수 파이썬으로
+# .bag을 읽는다.
+#
+# 설치:
+#   python3.10 -m venv .venv && source .venv/bin/activate   # Jetson Orin은 python3.8
+#   pip install -r requirements.txt
+# 또는 scripts/setup_env.sh 로 한 번에.
+
+numpy>=1.24
+scipy>=1.10
+
+# gui/core/detect_camera.py: estimatePoseSingleMarkers/estimatePoseBoard가
+# OpenCV 4.7 이후 제거되어 solvePnP 기반으로 다시 짰다. 4.11에서 실측 검증.
+opencv-python==4.11.0.86
+
+# step 4/5/7 포인트클라우드 3D 뷰, RANSAC 평면 피팅에 사용.
+# x86_64는 0.19.x까지 있지만 aarch64(Jetson 등) PyPI wheel은 0.18.0이 최신이라
+# 정확히 0.19.0으로 고정하면 aarch64에서 설치가 실패한다. 범위로 열어 플랫폼별
+# 최신을 받게 한다.
+open3d>=0.18,<0.20
+
+# ROS 환경 없이 rosbag(.bag, ROS2 bag 폴더) 읽기.
+# rosbags는 0.10.0부터 Requires-Python >=3.10이라 Jetson Orin(python3.8)에서는
+# 설치 자체가 안 된다. 3.8을 지원하는 마지막 버전(0.9.23)으로 고정.
+rosbags==0.11.3; python_version >= "3.9"
+rosbags==0.9.23; python_version < "3.9"
+
+# 데스크톱 GUI (Qt6 바인딩).
+# 6.9.3의 aarch64 wheel은 manylinux_2_39(glibc 2.39 필요) + cp39 이상 전용이라
+# Jetson Orin(Ubuntu 20.04, glibc 2.31, python3.8)에서는 설치가 안 된다.
+# python3.8 + manylinux_2_31 조합에서 받을 수 있는 마지막 버전(6.6.3.1)으로 고정
+# (실측: 이 조합은 이미 이 저장소의 Jetson 개발기에 설치돼 검증됨).
+PySide6==6.9.3; python_version >= "3.9"
+PySide6==6.6.3.1; python_version < "3.9"
+
+# step 4/5의 3D 뷰, step 2 undistort 미리보기 플롯.
+# 0.14.0은 Requires-Python >=3.10. python3.8을 지원하는 마지막 버전(0.13.3)으로 고정.
+pyqtgraph==0.14.0; python_version >= "3.9"
+pyqtgraph==0.13.3; python_version < "3.9"
+
+# gui/config/*.yaml (카메라·타겟 프리셋), 프로젝트 파일(.calib.yaml/.local.yaml).
+PyYAML>=6.0
