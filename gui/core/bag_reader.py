@@ -175,6 +175,37 @@ class BagSource:
             yield stamp, self._reader.deserialize(raw, conn.msgtype)
 
 
+# Only the pin lookup below needs to be exact rather than merely close, so its
+# window just has to be comfortably tighter than real camera message spacing
+# (tens of milliseconds at any normal frame rate) -- 1 ms leaves no room for a
+# neighbouring message to be mistaken for the one actually pinned.
+_PIN_WINDOW_NS = 1_000_000
+
+
+def pick_camera_for_frame(src, camera_topic: str, lidar_t_ns: int, pinned_camera_t_ns: "int | None" = None):
+    """Which camera message a LiDAR moment should be shown with.
+
+    Ordinary navigation asks for the first camera message at or after the
+    LiDAR timestamp (`first_after`) -- reproducible from `lidar_t_ns` alone,
+    which is all normal timeline scrubbing has to work with.
+
+    `pinned_camera_t_ns` exists for exactly one case: jumping to a frame a
+    *different* pairing rule already scored -- Multi-frame Consistency pairs
+    each sampled LiDAR moment with its temporally *nearest* camera image, not
+    the first one after it, because on a moving vehicle a loose pairing shows
+    up in the pixel error just like a rotation error would. Left to
+    `first_after`, jumping to that frame's timestamp could display a
+    different image than the one actually scored -- looking directly for the
+    exact camera timestamp the evaluation used is what closes that gap,
+    without needing a second rendering path: this is still the same
+    `(stamp, message)` pair `first_after`/`nearest` always return, just with
+    the search anchored on the known camera stamp instead of the LiDAR one.
+    """
+    if pinned_camera_t_ns is not None:
+        return src.nearest(camera_topic, pinned_camera_t_ns, window_ns=_PIN_WINDOW_NS)
+    return src.first_after(camera_topic, lidar_t_ns)
+
+
 def sweeps_around(src: "BagSource", topic: str, t_ns: int, frames: int = 5, progress=None):
     """The individual sweeps nearest t_ns, newest-in-the-middle order kept.
 
