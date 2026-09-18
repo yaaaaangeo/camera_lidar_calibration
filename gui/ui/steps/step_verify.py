@@ -13,6 +13,7 @@ is not a weakness here: it is the only thing that can decide.
 
 from __future__ import annotations
 
+import html
 import threading
 
 import numpy as np
@@ -25,6 +26,7 @@ from gui.core.detect_camera import detect as detect_camera
 from gui.core.detect_lidar import DetectParams, apply_box, detect as detect_lidar, point_spacing
 from pathlib import Path
 
+from gui.core.evaluation import diagnostics as dg
 from gui.core.evaluation import edge_alignment as ea
 from gui.core.evaluation import multiframe_consistency as mc
 from gui.core.evaluation import perturbation as pert
@@ -491,6 +493,20 @@ class VerifyStep(StepPage):
         self._pert_result: pert.PerturbationResult | None = None
         self._fine_gen = 0
         self._fine_result: pert.AxisSensitivity | None = None
+        # What each stored result was computed against -- (R, t) copies plus
+        # the run settings the diagnostics need to describe it. Diagnostics
+        # compare these to the extrinsic shown *now* and leave a stale result
+        # out rather than interpret numbers that belong to a different T.
+        self._eval_result: ea.EdgeAlignmentResult | None = None
+        self._eval_spatial: sa.SpatialAnalysisResult | None = None
+        self._eval_T: tuple | None = None
+        self._mf_T: tuple | None = None
+        self._mf_sync_limit_ms: float = 0.0
+        self._pert_T: tuple | None = None
+        self._pert_sync_limit_ms: float = 0.0
+        self._fine_T: tuple | None = None
+        self._fine_mode: str = "multi_frame"
+        self._diag_report: dg.DiagnosticReport | None = None
 
         # --- controls --------------------------------------------------------
         # Checking the extrinsic only at the scenes it was fitted to is marking
@@ -930,6 +946,33 @@ class VerifyStep(StepPage):
         self.fine_spatial_label.setTextFormat(QtCore.Qt.RichText)
         self.fine_spatial_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
 
+        # --- diagnostic evidence (interpretation only) -------------------------
+        # Reads the results above as they already are; never re-projects,
+        # re-scores, re-perturbs, or re-solves, and never offers to change T --
+        # see gui.core.evaluation.diagnostics.
+        self.diag_info_label = QtWidgets.QLabel(
+            "<span style='color:palette(mid)'>이미 계산된 결과만 해석합니다 — 원인을 확정하거나 "
+            "T_cam_lidar를 수정하지 않습니다.<br>"
+            "<b>Evidence strength, not a calibration correctness score.</b></span>"
+        )
+        self.diag_info_label.setWordWrap(True)
+
+        self.diag_run_btn = QtWidgets.QPushButton("진단 요약 생성")
+        self.diag_run_btn.setToolTip(
+            "Multi-frame / Perturbation / Fine Scan / 현재 프레임 평가 / 6단계 Leave-One-Out 결과를\n"
+            "evidence category 별로 묶어 보여줍니다. 새로운 평가는 실행하지 않습니다."
+        )
+        self.diag_run_btn.clicked.connect(self._generate_diagnostics)
+
+        self.diag_copy_btn = QtWidgets.QPushButton("진단 결과 복사")
+        self.diag_copy_btn.setEnabled(False)
+        self.diag_copy_btn.clicked.connect(self._copy_diagnostics)
+
+        self.diag_label = QtWidgets.QLabel("—")
+        self.diag_label.setTextFormat(QtCore.Qt.RichText)
+        self.diag_label.setWordWrap(True)
+        self.diag_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
         # --- layout ----------------------------------------------------------
         top = QtWidgets.QHBoxLayout()
         top.addWidget(QtWidgets.QLabel("bag"))
@@ -1079,6 +1122,14 @@ class VerifyStep(StepPage):
         eval_layout.addWidget(self.fine_summary_label)
         eval_layout.addWidget(QtWidgets.QLabel("Spatial (Baseline vs Lowest tested)"))
         eval_layout.addWidget(self.fine_spatial_label)
+        eval_layout.addSpacing(14)
+        eval_layout.addWidget(QtWidgets.QLabel("<b>Diagnostic Evidence</b>"))
+        eval_layout.addWidget(self.diag_info_label)
+        diag_row = QtWidgets.QHBoxLayout()
+        diag_row.addWidget(self.diag_run_btn, 1)
+        diag_row.addWidget(self.diag_copy_btn)
+        eval_layout.addLayout(diag_row)
+        eval_layout.addWidget(self.diag_label)
         eval_layout.addStretch(1)
         eval_box = QtWidgets.QWidget()
         eval_box.setLayout(eval_layout)
@@ -1793,6 +1844,8 @@ class VerifyStep(StepPage):
         # frame before this result comes back, self._image will have already
         # moved on by the time _display_edge_alignment runs.
         self._eval_frame_shape = self._image.shape[:2]
+        self._eval_result, self._eval_spatial = None, None
+        self._eval_T = (sol.R.copy(), sol.t.copy())
         self.eval_run_btn.setEnabled(False)
         self.eval_edge_label.setText("<span style='color:palette(mid)'>평가 중…</span>")
         self.request_eval_current.emit(
@@ -1815,6 +1868,7 @@ class VerifyStep(StepPage):
         self.eval_depth_label.setText("—")
 
     def _display_edge_alignment(self, result: "ea.EdgeAlignmentResult"):
+        self._eval_result = result
         if not result.ok:
             self.eval_edge_label.setText(f"<span style='color:palette(mid)'>{result.reason}</span>")
             self.eval_spatial_label.setText("—")
@@ -1833,6 +1887,7 @@ class VerifyStep(StepPage):
 
         h, w = self._eval_frame_shape
         spatial = sa.analyze_spatial(result, w, h)
+        self._eval_spatial = spatial
         if spatial is None:
             self.eval_spatial_label.setText("—")
             self.eval_depth_label.setText("—")
@@ -1866,6 +1921,9 @@ class VerifyStep(StepPage):
         self.mf_progress_label.setText(f"평가 중 0 / {n_samples}")
         self.mf_summary_label.setText("—")
         self.mf_worst_table.setRowCount(0)
+        self._mf_result = None
+        self._mf_T = (sol.R.copy(), sol.t.copy())
+        self._mf_sync_limit_ms = float(self.max_sync_spin.value())
 
         p = self.project
         self.request_multiframe.emit(
@@ -2019,6 +2077,9 @@ class VerifyStep(StepPage):
         self.pert_frame_table_label.setText("—")
         self.pert_summary_label.setText("—")
         self.pert_spatial_label.setText("—")
+        self._pert_result = None
+        self._pert_T = (sol.R.copy(), sol.t.copy())
+        self._pert_sync_limit_ms = float(self.max_sync_spin.value())
 
         rotation_deltas, translation_deltas = self._pert_search_deltas()
         p = self.project
@@ -2147,7 +2208,7 @@ class VerifyStep(StepPage):
         unit = "°" if axis.unit == "deg" else "mm"
         header = "".join(
             f"<th style='text-align:right;padding:0 6px'>{h}</th>"
-            for h in ("Δ", "Frame P95(med)", "ΔFrame-P95(med)", "Improved", "Worsened", "Unchanged", "Ratio", "Coverage")
+            for h in ("Δ", "Frame P95(med)", "ΔFrame-P95(med)", "Improved", "Worsened", "Unchanged", "Ratio", "Both valid")
         )
         rows = [f"<tr>{header}</tr>"]
         baseline_valid = axis.baseline.n_valid_frames
@@ -2170,14 +2231,13 @@ class VerifyStep(StepPage):
                 continue
             d_frame_p95 = f"{p.median_delta_frame_p95_px:+.2f}" if np.isfinite(p.median_delta_frame_p95_px) else "—"
             ratio = f"{p.improved_frame_ratio * 100:.0f}%" if np.isfinite(p.improved_frame_ratio) else "—"
+            # Named by which side actually failed -- a frame baseline scored
+            # but this candidate could not is "Candidate failed", never lumped
+            # in with "Candidate-only valid" (see frame_coverage_breakdown).
             coverage = f"{p.n_comparable_frames}/{baseline_valid}"
-            extra = []
-            if p.n_candidate_only_valid:
-                extra.append(f"cand-only {p.n_candidate_only_valid}")
-            if p.n_both_failed:
-                extra.append(f"both-fail {p.n_both_failed}")
+            extra = [f"{label} {n}" for label, n in pert.frame_coverage_breakdown(p)[1:] if n]
             if extra:
-                coverage += " (" + ", ".join(extra) + ")"
+                coverage += "<br>" + "<br>".join(extra)
             rows.append(
                 f"<tr style='{weight}'>"
                 f"<td>{delta_text}</td>"
@@ -2190,18 +2250,25 @@ class VerifyStep(StepPage):
                 f"<td align='right'>{coverage}</td>"
                 f"</tr>"
             )
-        return "<table cellspacing='4'>" + "".join(rows) + "</table>"
+        legend = (
+            "<div style='color:palette(mid)'>Both valid = baseline·candidate 모두 평가된 frame (paired 비교 대상) / "
+            "baseline 유효 frame. Candidate failed = baseline만 유효, Candidate-only valid = candidate만 유효, "
+            "Both failed = 둘 다 실패.</div>"
+        )
+        return "<table cellspacing='4'>" + "".join(rows) + "</table>" + legend
 
     @staticmethod
     def _perturbation_summary_html(axis: "pert.AxisSensitivity") -> str:
         unit = "°" if axis.unit == "deg" else "mm"
-        metric_label = "Frame-balanced (median of per-frame P95)" if axis.ranking_metric == "median_frame_p95" else "Pooled P95"
-        lines = [f"<span style='color:palette(mid)'>Ranking basis: {metric_label}</span>"]
+        name = axis.ranking_metric_name
+        prefix = "Frame-balanced — " if axis.ranking_metric == "median_frame_p95" else ""
+        lines = [f"<span style='color:palette(mid)'>Ranking basis: {prefix}{name}</span>"]
+        lines.append(f"Baseline ({name}): {axis.ranking_baseline_px:.2f} px")
         if axis.lowest_point is axis.baseline:
             lines.append("Lowest tested: baseline (0)")
         else:
-            lines.append(f"Lowest tested: {axis.lowest_point.delta:+.2f}{unit}")
-            lines.append(f"Improvement: {axis.improvement_p95_px:.2f} px")
+            lines.append(f"Lowest tested: {axis.lowest_point.delta:+.2f}{unit} → {axis.ranking_best_px:.2f} px")
+            lines.append(f"Improvement ({name}): {axis.ranking_improvement_px:.2f} px")
         lines.append(f"Baseline local minimum: <b>{'Yes' if axis.is_local_minimum else 'No'}</b>")
         return "<br>".join(lines)
 
@@ -2289,6 +2356,9 @@ class VerifyStep(StepPage):
         self.fine_frame_table_label.setText("—")
         self.fine_summary_label.setText("—")
         self.fine_spatial_label.setText("—")
+        self._fine_result = None
+        self._fine_T = (sol.R.copy(), sol.t.copy())
+        self._fine_mode = mode
 
         p = self.project
         self.request_fine_scan.emit(
@@ -2338,6 +2408,130 @@ class VerifyStep(StepPage):
         self.fine_frame_table_label.setText(self._perturbation_frame_table_html(axis))
         self.fine_summary_label.setText(self._perturbation_summary_html(axis))
         self.fine_spatial_label.setText(self._perturbation_spatial_html(axis))
+
+    # ------------------------------------------------------ diagnostic evidence
+    #
+    # Only gathers what the sections above already computed and hands it to
+    # gui.core.evaluation.diagnostics -- every rule lives there, not here.
+    # Nothing in this section writes to self._sol, the project, or a file.
+
+    def _diagnostic_inputs(self) -> "dg.DiagnosticInputs":
+        sol = self._effective()
+        R, t = (sol.R, sol.t) if sol is not None and sol.ok else (None, None)
+        notes: list = []
+
+        def fresh(result, T, name):
+            if result is None:
+                return None
+            if T is None or not dg.extrinsic_matches(T[0], T[1], R, t):
+                notes.append(f"{name} result excluded: it was computed for a different extrinsic -- rerun it.")
+                return None
+            return result
+
+        pert_result = fresh(self._pert_result, self._pert_T, "Perturbation Sensitivity")
+        fine_result = fresh(self._fine_result, self._fine_T, "Fine Scan")
+        mf_result = fresh(self._mf_result, self._mf_T, "Multi-frame evaluation")
+        eval_result = fresh(self._eval_result, self._eval_T, "Current-frame evaluation")
+        eval_spatial = self._eval_spatial if eval_result is not None else None
+
+        calibration = dg.CalibrationContext()
+        step = self._calibrate_step()
+        if self._loaded_from is not None:
+            calibration.unavailable_reason = (
+                "The extrinsic was loaded from a file; Step 6 leave-one-out describes a different solution."
+            )
+        elif step is None or getattr(step, "solution", None) is not self._sol or self._sol is None:
+            calibration.unavailable_reason = "No Step 6 solution matches the extrinsic being verified."
+        else:
+            calibration.loo = getattr(step, "loo", None)
+            calibration.rmse_m = self._sol.rmse
+            calibration.n_scenes = len(self._sol.scene_ids)
+            if self._flipped:
+                notes.append(
+                    "The shown extrinsic is the half-turn flipped version; Step 6 leave-one-out describes the "
+                    "unflipped solve."
+                )
+
+        return dg.DiagnosticInputs(
+            perturbation=pert_result,
+            fine_scan=fine_result,
+            fine_scan_mode=self._fine_mode,
+            multiframe=mf_result,
+            multiframe_sync_limit_ms=self._mf_sync_limit_ms or None,
+            perturbation_sync_limit_ms=self._pert_sync_limit_ms or None,
+            current_frame=eval_result,
+            current_frame_spatial=eval_spatial,
+            calibration=calibration,
+            notes=notes,
+        )
+
+    def _generate_diagnostics(self):
+        sol = self._effective()
+        if sol is None or not sol.ok:
+            self.window().statusBar().showMessage(
+                "6단계 계산 또는 extrinsic 불러오기가 먼저 필요합니다.", 5000
+            )
+            return
+        self._diag_report = dg.build_diagnostic_report(self._diagnostic_inputs())
+        self.diag_label.setText(self._diagnostic_html(self._diag_report))
+        self.diag_copy_btn.setEnabled(True)
+
+    def _copy_diagnostics(self):
+        if self._diag_report is None:
+            return
+        QtWidgets.QApplication.clipboard().setText(dg.format_report_text(self._diag_report))
+        self.window().statusBar().showMessage("진단 결과를 복사했습니다.", 3000)
+
+    @staticmethod
+    def _diagnostic_html(report: "dg.DiagnosticReport") -> str:
+        esc = lambda s: html.escape(s).replace("\n", "<br>")  # noqa: E731
+        muted = {dg.NOT_OBSERVED, dg.INSUFFICIENT, dg.UNAVAILABLE}
+
+        def strength(item) -> str:
+            style = "color:palette(mid)" if item.strength in muted else "font-weight:bold"
+            text = f"<span style='{style}'>{esc(item.strength)}</span>"
+            if item.mixed:
+                text += " <span style='color:#b26a00;font-weight:bold'>(Mixed)</span>"
+            return text
+
+        mode_text = {dg.MODE_MULTI: "Multi-frame", dg.MODE_SINGLE: "Single-frame diagnostic",
+                     dg.MODE_NONE: "Insufficient data"}
+        parts = [f"<div style='color:palette(mid)'>Mode: {mode_text.get(report.mode, report.mode)}</div>"]
+        parts += [f"<div style='color:palette(mid)'>• {esc(n)}</div>" for n in report.notes]
+        parts.append(f"<p><b>{esc(report.headline)}</b></p>")
+
+        parts.append("<p><b>Root Cause Candidates</b><br><span style='color:palette(mid)'>"
+                     "Ordered by evidence strength and frame consistency; order is not a probability.</span></p>")
+        if report.candidates:
+            items = "".join(
+                f"<li>{esc(c.title)} — Evidence: {strength(c)}"
+                + "".join(f"<br>{esc(t)}" for t in c.interpretations)
+                + "</li>"
+                for c in report.candidates
+            )
+            parts.append(f"<ol>{items}</ol>")
+        else:
+            parts.append("<div style='color:palette(mid)'>(none)</div>")
+
+        for category in dg.CATEGORY_ORDER:
+            items = [i for i in report.evidence if i.category == category]
+            if not items:
+                continue
+            parts.append(f"<hr><b>{esc(category)}</b>")
+            for item in items:
+                block = [f"<p><b>{esc(item.title)}</b><br>Evidence: {strength(item)}</p>"]
+                if item.metrics:
+                    block.append(VerifyStep._rows_table([(esc(k), esc(v)) for k, v in item.metrics]))
+                if item.observations:
+                    block.append("Observed:<ul>" + "".join(f"<li>{esc(o)}</li>" for o in item.observations) + "</ul>")
+                if item.interpretations:
+                    block.append("Possible interpretation:<ul>"
+                                 + "".join(f"<li>{esc(t)}</li>" for t in item.interpretations) + "</ul>")
+                if item.caveats:
+                    block.append("<ul style='color:palette(mid)'>"
+                                 + "".join(f"<li>{esc(c)}</li>" for c in item.caveats) + "</ul>")
+                parts.append("".join(block))
+        return "".join(parts)
 
     # ---------------------------------------------------------------- export
 

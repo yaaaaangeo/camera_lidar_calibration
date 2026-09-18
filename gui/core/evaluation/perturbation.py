@@ -268,6 +268,12 @@ class PerturbationPoint:
     p95_delta_frame_p95_px: float = float("nan")
 
 
+RANKING_METRIC_NAMES = {
+    "pooled_p95": "Pooled P95",
+    "median_frame_p95": "Median of per-frame P95",
+}
+
+
 @dataclass
 class AxisSensitivity:
     axis: str
@@ -279,12 +285,27 @@ class AxisSensitivity:
     # version anyway) or "median_frame_p95" (Multi-frame mode's default: the
     # median of each trial's own per-frame P95 values, so one edge-rich frame
     # cannot dominate which perturbation looks "best"). Only decides which
-    # value lowest_point/improvement_p95_px/is_local_minimum are judged by --
-    # both underlying numbers are always present on every PerturbationPoint.
+    # value lowest_point/ranking_*/is_local_minimum are judged by -- both
+    # underlying numbers are always present on every PerturbationPoint.
     ranking_metric: str = "pooled_p95"
     lowest_point: Optional[PerturbationPoint] = None      # best by `ranking_metric` (may be baseline)
-    improvement_p95_px: float = float("nan")              # baseline - lowest, in whichever metric was used to rank
+    # Legacy name, kept for existing callers: despite "p95" it holds the
+    # improvement in whichever `ranking_metric` was used -- under
+    # "median_frame_p95" that is NOT a pooled-P95 improvement. New code should
+    # read `ranking_improvement_px` (same value) alongside `ranking_metric_name`.
+    improvement_p95_px: float = float("nan")
     is_local_minimum: bool = True
+    # The ranking metric's value at baseline and at `lowest_point`, and
+    # baseline - lowest (positive = the lowest tested point is lower).
+    ranking_baseline_px: float = float("nan")
+    ranking_best_px: float = float("nan")
+    ranking_improvement_px: float = float("nan")
+
+    @property
+    def ranking_metric_name(self) -> str:
+        """Human-readable name of `ranking_metric`, derived rather than stored
+        so it can never disagree with the metric actually used."""
+        return RANKING_METRIC_NAMES.get(self.ranking_metric, self.ranking_metric)
 
 
 @dataclass
@@ -419,6 +440,20 @@ def _pair_frame_metrics(baseline_per_frame: dict, candidate_per_frame: dict, tol
     }
 
 
+def frame_coverage_breakdown(point: PerturbationPoint) -> list:
+    """(label, count) for a candidate point's paired coverage vs baseline,
+    named by which side actually failed: "Candidate failed" is a frame
+    baseline scored but this candidate could not (`n_baseline_only_valid`),
+    never to be confused with "Candidate-only valid" (baseline failed, the
+    candidate scored)."""
+    return [
+        ("Both valid", point.n_comparable_frames),
+        ("Candidate failed", point.n_baseline_only_valid),
+        ("Candidate-only valid", point.n_candidate_only_valid),
+        ("Both failed", point.n_both_failed),
+    ]
+
+
 def _rank_value(point: PerturbationPoint, ranking_metric: str) -> float:
     return point.median_frame_p95_px if ranking_metric == "median_frame_p95" else point.p95_px
 
@@ -442,7 +477,7 @@ def summarize_axis(
     count (a real accuracy claim would need the same frames counted).
 
     `ranking_metric` ("pooled_p95" or "median_frame_p95") decides only which
-    number `lowest_point`/`improvement_p95_px`/`is_local_minimum` are judged
+    number `lowest_point`/`ranking_*`/`is_local_minimum` are judged
     by -- Multi-frame mode uses "median_frame_p95" so one edge-rich frame
     cannot single-handedly make a perturbation look best; Current-Frame mode
     (a single frame) uses "pooled_p95", which is numerically identical to the
@@ -472,11 +507,14 @@ def summarize_axis(
 
     ok_points = [p for p in points if p.ok]
     lowest = min(ok_points, key=lambda p: _rank_value(p, ranking_metric)) if ok_points else baseline_point
-    improvement = _rank_value(baseline_point, ranking_metric) - _rank_value(lowest, ranking_metric)
+    baseline_value = _rank_value(baseline_point, ranking_metric)
+    best_value = _rank_value(lowest, ranking_metric)
+    improvement = baseline_value - best_value
     return AxisSensitivity(
         axis=axis, unit=unit, points=points, baseline=baseline_point,
         ranking_metric=ranking_metric, lowest_point=lowest, improvement_p95_px=improvement,
         is_local_minimum=bool(improvement <= local_min_tolerance_px),
+        ranking_baseline_px=baseline_value, ranking_best_px=best_value, ranking_improvement_px=improvement,
     )
 
 

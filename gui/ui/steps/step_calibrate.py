@@ -77,6 +77,9 @@ class CalibrateStep(StepPage):
         self.detections: dict[str, tuple] = {}  # id -> (lidar centres, camera centres)
         self.notes: dict[str, str] = {}
         self.solution: Solution | None = None
+        # leave_one_out() output for `solution`, kept so step 7's diagnostics
+        # can read it without re-running the solver.
+        self.loo: dict = {}
 
         self.run_btn = QtWidgets.QPushButton("모든 scene 검출 후 계산")
         self.run_btn.clicked.connect(self._run)
@@ -207,6 +210,7 @@ class CalibrateStep(StepPage):
         scenes = self._enabled_scenes()
         self.solution = solve(scenes) if scenes else None
         loo = leave_one_out(scenes) if len(scenes) >= 3 else {}
+        self.loo = loo
         self._fill_table(loo)
         self._show_result(scenes)
         self.changed.emit()
