@@ -372,6 +372,7 @@ def test_diagnostics_never_calls_projection_edge_or_solver(monkeypatch):
     import cv2
 
     import gui.core.evaluation.edge_alignment as ea_mod
+    import gui.core.evaluation.holdout as ho_mod
     import gui.core.evaluation.perturbation as pert_mod
     import gui.core.evaluation.spatial_analysis as sa_mod
     import gui.core.solve as solve_mod
@@ -385,11 +386,12 @@ def test_diagnostics_never_calls_projection_edge_or_solver(monkeypatch):
         (ea_mod, "evaluate_edge_alignment"),
         (pert_mod, "evaluate_edge_alignment"),
         (pert_mod, "_evaluate_trial"),
-        (pert_mod, "_run_trial_point"),
+        (pert_mod, "run_trial_point"),
         (pert_mod, "evaluate_perturbation_grid"),
         (pert_mod, "evaluate_single_axis"),
         (pert_mod, "compute_edge_orientation_map"),
         (sa_mod, "analyze_spatial"),
+        (ho_mod, "evaluate_holdout"),
         (solve_mod, "solve"),
         (solve_mod, "leave_one_out"),
         (cv2, "Canny"),

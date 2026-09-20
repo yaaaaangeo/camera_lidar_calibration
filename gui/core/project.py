@@ -12,6 +12,8 @@ only needs the bag to be located again -- everything else carries over.
 
 from __future__ import annotations
 
+import os
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -264,6 +266,18 @@ class Project:
     # the recordings again.
     bag_paths: list[str] = field(default_factory=list)
 
+    # Step 7's Independent Hold-out Validation exposure history -- which
+    # candidate was first revealed on which Hold-out data, kept across app
+    # restarts so re-evaluating a previously-seen Hold-out with a different
+    # candidate is still correctly flagged as no longer independent (see
+    # gui.core.evaluation.holdout's module docstring). Deliberately an opaque
+    # dict here: Project only round-trips it through YAML unexamined, and
+    # gui.core.evaluation.holdout owns its shape (version, schema, and the
+    # serialize/deserialize functions), so this module never needs to import
+    # anything from gui.core.evaluation. Missing from an older project file
+    # simply means no history -- see `load` below.
+    validation_history: dict = field(default_factory=dict)
+
     @property
     def bag_path(self) -> str:
         """The first recording -- what single-bag screens work against."""
@@ -291,6 +305,23 @@ class Project:
 
     # ------------------------------------------------------------------- io
 
+    @staticmethod
+    def _atomic_write_yaml(path: Path, data: dict) -> None:
+        """Shared by `save` and `patch_validation_history`: written to a
+        temporary file in the same directory, then atomically replaced over
+        `path` -- a crash or power loss mid-write leaves either the old file
+        intact or the new one complete, never a half-written
+        `<name>.calib.yaml`."""
+        text = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.stem}-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(text)
+            os.replace(tmp_name, path)
+        except BaseException:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise
+
     def save(self, path: str | Path):
         """Write the whole project to one file.
 
@@ -301,6 +332,15 @@ class Project:
         is the extrinsic in `calib_result/`. With nothing shared there is nothing
         to overwrite, and two files that must travel together are one more thing
         to get wrong.
+
+        Written atomically (see `_atomic_write_yaml`). This is the *whole*
+        in-memory project -- every field, as it currently stands here in
+        memory -- which is exactly right for an explicit "저장…" click, but
+        wrong for the Hold-out/Discovery auto-persistence path: use
+        `patch_validation_history` for that instead, so an unrelated unsaved
+        edit elsewhere in the project (a scene, a filter box) is never
+        silently written to disk just because a Hold-out result was
+        revealed. See `patch_validation_history`'s docstring.
         """
         path = Path(path)
         shared = {
@@ -310,6 +350,7 @@ class Project:
             "camera_topic": self.camera_topic,
             "camera": asdict(self.camera),
             "target": asdict(self.target),
+            "validation_history": self.validation_history,
             "scenes": [
                 {
                     "id": s.id,
@@ -323,7 +364,36 @@ class Project:
                 for s in self.scenes
             ],
         }
-        path.write_text(yaml.safe_dump(shared, sort_keys=False, allow_unicode=True))
+        Project._atomic_write_yaml(path, shared)
+
+    @staticmethod
+    def patch_validation_history(path: str | Path, validation_history: dict) -> None:
+        """Persist ONLY `validation_history` to the project file at `path`,
+        leaving every other top-level field exactly as it already is *on
+        disk* -- even if the in-memory `Project` that produced
+        `validation_history` also holds unsaved changes to scenes, filters,
+        bag configuration, etc. that the user has not pressed "저장…" for
+        yet. Those must never be silently promoted to "saved" just because a
+        Hold-out result was revealed or a Discovery run completed -- that is
+        what `save()` is for, on the user's own explicit action.
+
+        Reads the file currently on disk (never `self` -- this is a
+        `staticmethod` on purpose, so a caller cannot reach for `self.name`/
+        `self.scenes`/etc. by mistake), replaces just the one key, and
+        writes back atomically (see `_atomic_write_yaml`).
+
+        A no-op when `path` does not exist yet: there is nothing to patch,
+        and this method never creates a project file from scratch (that
+        first save must be the user's own explicit `save()`) -- see
+        step_verify.py's `_refresh_holdout_persistence_note` for the UI
+        note shown while a project has no file path yet.
+        """
+        path = Path(path)
+        if not path.exists():
+            return
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data["validation_history"] = validation_history
+        Project._atomic_write_yaml(path, data)
 
     @classmethod
     def load(cls, path: str | Path) -> "Project":
@@ -335,6 +405,7 @@ class Project:
             camera_topic=d.get("camera_topic", ""),
             camera=Camera(**(d.get("camera") or {})),
             target=Target(**(d.get("target") or {})),
+            validation_history=d.get("validation_history") or {},
             scenes=[
                 Scene(
                     id=s["id"],

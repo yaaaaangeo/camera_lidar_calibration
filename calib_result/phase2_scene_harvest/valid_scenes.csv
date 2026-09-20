@@ -1,0 +1,2 @@
+frame_index,camera_index,lidar_index,camera_header_ns,lidar_record_ns,board_median_ns,camera_minus_board_ms,camera_reproj_rms_px,lidar_circle_count,lidar_plane_point_count,motion_group,motion_translation_velocity_mm_s,motion_rotation_velocity_deg_s,pose_distance_m,pose_yaw_deg,pose_pitch_deg,pose_roll_deg
+355,354,355,1789352619436927441,1789352619536836343,1789352619432337152,4.590289,0.5832544181755145,4,926,HIGH,940.7441240548183,21.000191864418483,9.766100854826579,-0.5499234493332684,-16.13236485489098,-173.04607457380595

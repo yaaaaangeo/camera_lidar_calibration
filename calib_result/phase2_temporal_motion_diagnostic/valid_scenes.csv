@@ -1,0 +1,2 @@
+scene_id,frame_index,camera_header_ns,lidar_board_ns,timestamp_difference_ms,board_point_count,board_span_ms,camera_reproj_rms_px,translation_velocity_mm_s,rotation_velocity_deg_s,motion_status
+s01,407,1789352624652148713,1789352624635897856,16.250857,62,2.777088,0.6876217053328582,842.2198226459196,13.91023679007054,MOVING

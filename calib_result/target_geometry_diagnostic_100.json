@@ -1,0 +1,795 @@
+{
+  "best_scale_by_circle_ge1": {
+    "attempted": 88,
+    "boundary_success": 13,
+    "circle_ge1": 4,
+    "circle_ge2": 1,
+    "circle_ge3": 0,
+    "circle_ge4": 0,
+    "failure_reasons": {
+      "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+      "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+      "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+      "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+      "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+      "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+    },
+    "full_target": 0,
+    "geometry_passed": 0,
+    "label": "scale_1.00",
+    "plane_detected": 52,
+    "scale": 1.0
+  },
+  "collection_failures": [
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 84\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      3
+    ],
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 87\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      2
+    ],
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 89\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      2
+    ],
+    [
+      "\uc608\uce21\ud55c \uc790\ub9ac\uc5d0 \uc810\uc774 188\uac1c\ubfd0\uc785\ub2c8\ub2e4",
+      1
+    ],
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 88\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      1
+    ],
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 86\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      1
+    ],
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 85\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      1
+    ],
+    [
+      "\ucc3e\uc740 \ud3c9\uba74\uc774 \uc608\uce21\uacfc 83\u00b0 \uc5b4\uae0b\ub0a9\ub2c8\ub2e4 \u2014 \ubcbd\uc77c \uc218 \uc788\uc2b5\ub2c8\ub2e4",
+      1
+    ]
+  ],
+  "geometry_results": {
+    "Current": {
+      "plane_extent": {
+        "area_m2": {
+          "median": 7.102801611757792,
+          "p25": 2.872368683106763,
+          "p75": 18.522932540386265,
+          "p95": 44.494705186982465
+        },
+        "height_m": {
+          "median": 1.975068909593549,
+          "p25": 0.9774393702712891,
+          "p75": 3.4523216741277314,
+          "p95": 4.922882259735906
+        },
+        "n": 52,
+        "width_m": {
+          "median": 4.208569874814316,
+          "p25": 3.1492533211358684,
+          "p75": 8.552394742849257,
+          "p95": 12.453008041920139
+        }
+      },
+      "summary": {
+        "attempted": 88,
+        "boundary_success": 13,
+        "circle_ge1": 4,
+        "circle_ge2": 1,
+        "circle_ge3": 0,
+        "circle_ge4": 0,
+        "failure_reasons": {
+          "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+          "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+          "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+          "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+          "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+          "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+        },
+        "full_target": 0,
+        "geometry_passed": 0,
+        "label": "Current",
+        "plane_detected": 52,
+        "scale": 1.0
+      }
+    },
+    "Previous": {
+      "plane_extent": {
+        "area_m2": {
+          "median": 7.102801611757792,
+          "p25": 2.872368683106763,
+          "p75": 18.522932540386265,
+          "p95": 44.494705186982465
+        },
+        "height_m": {
+          "median": 1.975068909593549,
+          "p25": 0.9774393702712891,
+          "p75": 3.4523216741277314,
+          "p95": 4.922882259735906
+        },
+        "n": 52,
+        "width_m": {
+          "median": 4.208569874814316,
+          "p25": 3.1492533211358684,
+          "p75": 8.552394742849257,
+          "p95": 12.453008041920139
+        }
+      },
+      "summary": {
+        "attempted": 88,
+        "boundary_success": 13,
+        "circle_ge1": 1,
+        "circle_ge2": 1,
+        "circle_ge3": 0,
+        "circle_ge4": 0,
+        "failure_reasons": {
+          "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+          "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+          "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+          "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+          "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+        },
+        "full_target": 0,
+        "geometry_passed": 0,
+        "label": "Previous",
+        "plane_detected": 52,
+        "scale": 1.0
+      }
+    }
+  },
+  "motion_velocity": {
+    "invalid": 29,
+    "rotation_velocity_max_deg_s": 96.10377613591763,
+    "rotation_velocity_median_deg_s": 4.9804216773910515,
+    "rotation_velocity_p95_deg_s": 30.953708156731196,
+    "translation_velocity_max_mm_s": 1186.522172118492,
+    "translation_velocity_median_mm_s": 218.5708729932392,
+    "translation_velocity_p95_mm_s": 932.9826800136291,
+    "valid_pose_count": 71
+  },
+  "previous_current_comparison": [
+    {
+      "convention_same": true,
+      "current": 0.2,
+      "difference": 0.08120000000000001,
+      "parameter": "marker_size",
+      "previous": 0.1188,
+      "ratio": 1.6835016835016836
+    },
+    {
+      "convention_same": true,
+      "current": 0.55,
+      "difference": 0.22330000000000005,
+      "parameter": "delta_width_qr_center",
+      "previous": 0.3267,
+      "ratio": 1.6835016835016836
+    },
+    {
+      "convention_same": true,
+      "current": 0.35,
+      "difference": 0.14209999999999998,
+      "parameter": "delta_height_qr_center",
+      "previous": 0.2079,
+      "ratio": 1.6835016835016834
+    },
+    {
+      "convention_same": true,
+      "current": 0.5,
+      "difference": 0.203,
+      "parameter": "delta_width_circles",
+      "previous": 0.297,
+      "ratio": 1.6835016835016836
+    },
+    {
+      "convention_same": true,
+      "current": 0.4,
+      "difference": 0.16240000000000002,
+      "parameter": "delta_height_circles",
+      "previous": 0.2376,
+      "ratio": 1.6835016835016836
+    },
+    {
+      "convention_same": true,
+      "current": 0.12,
+      "difference": 0.04872,
+      "parameter": "circle_radius",
+      "previous": 0.07128,
+      "ratio": 1.6835016835016836
+    }
+  ],
+  "ratio_stats": {
+    "max": 1.6835016835016836,
+    "mean": 1.6835016835016834,
+    "min": 1.6835016835016834,
+    "std": 2.026980648162706e-16
+  },
+  "sample_count_with_roi": 88,
+  "scale_sweep": [
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 1,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 3\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.50",
+      "plane_detected": 52,
+      "scale": 0.5
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.55",
+      "plane_detected": 52,
+      "scale": 0.55
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.57",
+      "plane_detected": 52,
+      "scale": 0.57
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.59",
+      "plane_detected": 52,
+      "scale": 0.59
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.60",
+      "plane_detected": 52,
+      "scale": 0.6
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.61",
+      "plane_detected": 52,
+      "scale": 0.61
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.63",
+      "plane_detected": 52,
+      "scale": 0.63
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.65",
+      "plane_detected": 52,
+      "scale": 0.65
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.67",
+      "plane_detected": 52,
+      "scale": 0.67
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.69",
+      "plane_detected": 52,
+      "scale": 0.69
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.70",
+      "plane_detected": 52,
+      "scale": 0.7
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.71",
+      "plane_detected": 52,
+      "scale": 0.71
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 1,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 12,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.73",
+      "plane_detected": 52,
+      "scale": 0.73
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 2,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 11,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.75",
+      "plane_detected": 52,
+      "scale": 0.75
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 2,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 11,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.80",
+      "plane_detected": 52,
+      "scale": 0.8
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 3,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 10,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 2,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_0.90",
+      "plane_detected": 52,
+      "scale": 0.9
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.00",
+      "plane_detected": 52,
+      "scale": 1.0
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 1,
+      "circle_ge3": 1,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+        "\uc6d0 3\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.10",
+      "plane_detected": 52,
+      "scale": 1.1
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 0,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 4,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.20",
+      "plane_detected": 52,
+      "scale": 1.2
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 0,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 4,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.30",
+      "plane_detected": 52,
+      "scale": 1.3
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.40",
+      "plane_detected": 52,
+      "scale": 1.4
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.50",
+      "plane_detected": 52,
+      "scale": 1.5
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 0,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 4,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.60",
+      "plane_detected": 52,
+      "scale": 1.6
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 0,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 4,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.70",
+      "plane_detected": 52,
+      "scale": 1.7
+    },
+    {
+      "attempted": 88,
+      "boundary_success": 13,
+      "circle_ge1": 4,
+      "circle_ge2": 1,
+      "circle_ge3": 0,
+      "circle_ge4": 0,
+      "failure_reasons": {
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)": 33,
+        "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)": 6,
+        "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 9,
+        "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 3,
+        "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)": 1,
+        "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4": 36
+      },
+      "full_target": 0,
+      "geometry_passed": 0,
+      "label": "scale_1.80",
+      "plane_detected": 52,
+      "scale": 1.8
+    }
+  ],
+  "target_params_current": {
+    "circle_radius": 0.12,
+    "delta_height_circles": 0.4,
+    "delta_height_qr_center": 0.35,
+    "delta_width_circles": 0.5,
+    "delta_width_qr_center": 0.55,
+    "marker_size": 0.2
+  },
+  "target_params_previous": {
+    "circle_radius": 0.07128,
+    "delta_height_circles": 0.2376,
+    "delta_height_qr_center": 0.2079,
+    "delta_width_circles": 0.297,
+    "delta_width_qr_center": 0.3267,
+    "marker_size": 0.1188
+  },
+  "target_trace": [
+    {
+      "config_value": 0.2,
+      "convention": "length, not radius",
+      "meaning": "ArUco/QR marker side length",
+      "parameter": "marker_size",
+      "runtime_value": 0.2,
+      "unit": "m",
+      "used_in": "gui.core.detect_camera.board_model, gui.core.detect_lidar.find_holes_by_occupancy, gui.core.detect_lidar.find_holes_experimental, gui.core.synth"
+    },
+    {
+      "config_value": 0.55,
+      "convention": "center-to-center",
+      "meaning": "horizontal marker center-to-center spacing",
+      "parameter": "delta_width_qr_center",
+      "runtime_value": 0.55,
+      "unit": "m",
+      "used_in": "gui.core.detect_camera.board_model, gui.core.detect_lidar.find_holes_by_occupancy, gui.core.detect_lidar.find_holes_experimental, gui.core.synth"
+    },
+    {
+      "config_value": 0.35,
+      "convention": "center-to-center",
+      "meaning": "vertical marker center-to-center spacing",
+      "parameter": "delta_height_qr_center",
+      "runtime_value": 0.35,
+      "unit": "m",
+      "used_in": "gui.core.detect_camera.board_model, gui.core.detect_lidar.find_holes_by_occupancy, gui.core.detect_lidar.find_holes_experimental, gui.core.synth"
+    },
+    {
+      "config_value": 0.5,
+      "convention": "center-to-center",
+      "meaning": "horizontal hole center-to-center spacing",
+      "parameter": "delta_width_circles",
+      "runtime_value": 0.5,
+      "unit": "m",
+      "used_in": "gui.core.detect_camera.board_model, gui.core.detect_lidar._select_rectangle, gui.core.roi_auto.guess_box, gui.core.synth"
+    },
+    {
+      "config_value": 0.4,
+      "convention": "center-to-center",
+      "meaning": "vertical hole center-to-center spacing",
+      "parameter": "delta_height_circles",
+      "runtime_value": 0.4,
+      "unit": "m",
+      "used_in": "gui.core.detect_camera.board_model, gui.core.detect_lidar._select_rectangle, gui.core.roi_auto.guess_box, gui.core.synth"
+    },
+    {
+      "config_value": 0.12,
+      "convention": "radius, not diameter",
+      "meaning": "hole radius",
+      "parameter": "circle_radius",
+      "runtime_value": 0.12,
+      "unit": "m",
+      "used_in": "gui.core.detect_lidar.detect radius limits, gui.core.detect_lidar ring/occupancy thresholds, gui.core.roi_auto.guess_box, gui.core.synth"
+    }
+  ]
+}

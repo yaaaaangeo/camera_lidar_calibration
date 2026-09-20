@@ -17,7 +17,16 @@ from gui.core.detect_camera import detect as detect_camera
 from gui.core.detect_lidar import (
     DetectParams, apply_box, detect as detect_lidar, point_spacing,
 )
-from gui.core.project import Project
+from gui.core.evaluation.calibration_correspondence import (
+    SceneMetadata,
+    export_correspondence_diagnostics,
+)
+from gui.core.evaluation.correspondence_symmetry import (
+    analyze_calibration_symmetry,
+    decision_to_dict,
+    export_candidate_selection_evidence,
+)
+from gui.core.project import Project, RESULT_DIR
 from gui.core.solve import Solution, coverage, leave_one_out, solve
 from gui.ui.steps import StepPage
 from gui.ui.steps.step_filter import derive_params
@@ -25,7 +34,7 @@ from gui.ui.steps.step_filter import derive_params
 
 class _Worker(QtCore.QObject):
     progress = QtCore.Signal(str)
-    scene_done = QtCore.Signal(str, object, object, str)  # id, lidar pts, cam pts, note
+    scene_done = QtCore.Signal(str, object, object, object, str)  # id, lidar pts, cam pts, metadata, note
     finished = QtCore.Signal()
 
     def __init__(self):
@@ -43,10 +52,10 @@ class _Worker(QtCore.QObject):
                         self._src.close()
                     self._src = BagSource(bag)
                     self._src.open()
-                _, img_msg = self._src.first_after(camera_topic, scene.t_ns)
+                camera_stamp_ns, img_msg = self._src.first_after(camera_topic, scene.t_ns)
                 cam_det = detect_camera(image_to_bgr(img_msg), camera, target) if img_msg else None
                 if cam_det is None or not cam_det.ok:
-                    self.scene_done.emit(scene.id, None, None, f"카메라: {cam_det.reason if cam_det else '이미지 없음'}")
+                    self.scene_done.emit(scene.id, None, None, None, f"Camera: {cam_det.reason if cam_det else 'no image'}")
                     continue
 
                 cloud, _, single, _, ring = accumulate_cloud(
@@ -57,13 +66,33 @@ class _Worker(QtCore.QObject):
                 params.method = method  # keep step 5 and step 6 on the same detector
                 lid_det = detect_lidar(cloud, scene.filter, target, params, ring=ring)
                 if not lid_det.ok:
-                    self.scene_done.emit(scene.id, None, None, f"LiDAR: {lid_det.reason}")
+                    self.scene_done.emit(scene.id, None, None, None, f"LiDAR: {lid_det.reason}")
                     continue
 
-                self.scene_done.emit(scene.id, lid_det.centers, cam_det.centers, "")
+                metadata = SceneMetadata(
+                    scene_index=scene.id,
+                    camera_timestamp_ns=int(camera_stamp_ns) if camera_stamp_ns is not None else None,
+                    lidar_timestamp_ns=int(scene.t_ns),
+                    camera_header_stamp_ns=_header_stamp_ns(img_msg),
+                    lidar_header_stamp_ns=int(scene.t_ns),
+                    camera_physical_ids=list(getattr(cam_det, "center_ids", []) or []),
+                    camera_marker_ids=list(getattr(cam_det, "center_marker_ids", []) or []),
+                    camera_board_xy=[list(xy) for xy in (getattr(cam_det, "center_board_xy", []) or [])],
+                )
+                self.scene_done.emit(scene.id, lid_det.centers, cam_det.centers, metadata, "")
             except Exception as exc:  # noqa: BLE001 - reported per scene
-                self.scene_done.emit(scene.id, None, None, f"{type(exc).__name__}: {exc}")
+                self.scene_done.emit(scene.id, None, None, None, f"{type(exc).__name__}: {exc}")
         self.finished.emit()
+
+
+def _header_stamp_ns(msg) -> int | None:
+    header = getattr(msg, "header", None)
+    stamp = getattr(header, "stamp", None)
+    if stamp is None:
+        return None
+    sec = int(getattr(stamp, "sec", getattr(stamp, "secs", 0)) or 0)
+    nsec = int(getattr(stamp, "nanosec", getattr(stamp, "nsec", 0)) or 0)
+    return sec * 1_000_000_000 + nsec
 
 
 class CalibrateStep(StepPage):
@@ -75,8 +104,11 @@ class CalibrateStep(StepPage):
     def __init__(self, project: Project, parent=None):
         super().__init__(project, parent)
         self.detections: dict[str, tuple] = {}  # id -> (lidar centres, camera centres)
+        self.scene_metadata: dict[str, SceneMetadata] = {}
         self.notes: dict[str, str] = {}
         self.solution: Solution | None = None
+        self.correspondence_diagnostics: dict[str, object] = {}
+        self.symmetry_gate: dict[str, object] = {}
         # leave_one_out() output for `solution`, kept so step 7's diagnostics
         # can read it without re-running the solver.
         self.loo: dict = {}
@@ -168,8 +200,11 @@ class CalibrateStep(StepPage):
 
     def _run(self):
         self.detections.clear()
+        self.scene_metadata.clear()
         self.notes.clear()
         self.solution = None
+        self.correspondence_diagnostics = {}
+        self.symmetry_gate = {}
         self.table.setRowCount(0)
         self.run_btn.setEnabled(False)
         p = self.project
@@ -187,9 +222,11 @@ class CalibrateStep(StepPage):
             p.camera, p.target, method,
         )
 
-    def _on_scene(self, sid: str, lidar_pts, cam_pts, note: str):
+    def _on_scene(self, sid: str, lidar_pts, cam_pts, metadata, note: str):
         if lidar_pts is not None:
             self.detections[sid] = (lidar_pts, cam_pts)
+        if metadata is not None:
+            self.scene_metadata[sid] = metadata
         self.notes[sid] = note
 
     def _on_finished(self):
@@ -211,9 +248,63 @@ class CalibrateStep(StepPage):
         self.solution = solve(scenes) if scenes else None
         loo = leave_one_out(scenes) if len(scenes) >= 3 else {}
         self.loo = loo
+        self._export_correspondences(scenes)
+        self._evaluate_symmetry_gate(scenes)
         self._fill_table(loo)
         self._show_result(scenes)
         self.changed.emit()
+
+    def _export_correspondences(self, scenes):
+        self.correspondence_diagnostics = {}
+        sol = self.solution
+        if sol is None or not sol.ok or sol.R is None:
+            return
+        try:
+            scene_diags, summary, out_dir = export_correspondence_diagnostics(
+                scenes,
+                sol.R,
+                sol.t,
+                metadata=self.scene_metadata,
+            )
+            self.correspondence_diagnostics = {
+                "scenes": {d.scene_index: d for d in scene_diags},
+                "summary": summary,
+                "out_dir": out_dir,
+            }
+        except Exception as exc:  # noqa: BLE001 - diagnostic must not block calibration
+            self.correspondence_diagnostics = {"error": str(exc)}
+
+    def _evaluate_symmetry_gate(self, scenes):
+        self.symmetry_gate = {}
+        sol = self.solution
+        if sol is None or not sol.ok or sol.R is None or not scenes:
+            return
+        try:
+            candidates, decision = analyze_calibration_symmetry(
+                scenes,
+                seed_R=None,
+                seed_t=None,
+                include_all_permutations=False,
+            )
+            out_dir = export_candidate_selection_evidence(
+                candidates,
+                decision,
+                RESULT_DIR / "candidate_selection_evidence",
+                legacy_solution={
+                    "R_legacy": sol.R.tolist(),
+                    "t_legacy": [float(x) for x in sol.t],
+                    "rmse_mm": float(sol.rmse * 1000.0),
+                    "n_pairs": int(sol.n_pairs),
+                },
+            )
+            self.symmetry_gate = {
+                "candidates": candidates,
+                "decision": decision,
+                "decision_dict": decision_to_dict(decision),
+                "out_dir": out_dir,
+            }
+        except Exception as exc:  # noqa: BLE001 - gate evidence must not block diagnostics
+            self.symmetry_gate = {"error": str(exc)}
 
     def _fill_table(self, loo: dict):
         self.table.blockSignals(True)
@@ -230,12 +321,28 @@ class CalibrateStep(StepPage):
             self.table.setItem(r, 0, check)
             self.table.setItem(r, 1, QtWidgets.QTableWidgetItem(scene.id))
 
-            rmse = self.solution.per_scene_rmse.get(scene.id) if self.solution else None
+            diag = (self.correspondence_diagnostics.get("scenes", {}) or {}).get(scene.id)
+            rmse = (diag.fit_stats_mm["rmse"] / 1000.0) if diag else (
+                self.solution.per_scene_rmse.get(scene.id) if self.solution else None
+            )
             self.table.setItem(
                 r, 2, QtWidgets.QTableWidgetItem(f"{rmse * 1000:.1f} mm" if rmse else "—")
             )
 
             m = loo.get(scene.id)
+            if diag:
+                text = (
+                    f"LOO max {diag.loo_stats_mm['max']:.1f} mm / "
+                    f"dR {diag.delta_rotation_vs_global_deg:.2f} deg / "
+                    f"dt {diag.delta_translation_vs_global_mm:.0f} mm"
+                )
+                item = QtWidgets.QTableWidgetItem(text)
+                if diag.status != "OK":
+                    item.setForeground(QtGui.QColor("#d9534f"))
+                self.table.setItem(r, 3, item)
+                note = f"{diag.status}; cond={diag.geometry['condition_indicator']:.2f}; {self.notes.get(scene.id, '')}"
+                self.table.setItem(r, 4, QtWidgets.QTableWidgetItem(note))
+                continue
             if m:
                 text = f"{m['shift_mm']:.0f} mm / {m['rotation_deg']:.2f}°"
                 item = QtWidgets.QTableWidgetItem(text)
@@ -273,11 +380,12 @@ class CalibrateStep(StepPage):
         if len(scenes) < 3:
             warn = ('<div style="color:#d9534f">scene이 3개 미만입니다 — 회전이 잘 결정되지 않고, '
                     "보드의 180° 대칭 때문에 방향이 뒤집힐 수 있습니다.</div>")
+        symmetry = self._symmetry_html()
         self.result.setText(
             f"<b>RMSE {sol.rmse * 1000:.2f} mm</b>  ({sol.n_pairs}쌍, scene {len(scenes)}개)<br><br>"
             f"<b>Rcl</b><table>{rows}</table>"
             f"<b>Pcl</b> [{t[0]:.6f}, {t[1]:.6f}, {t[2]:.6f}]<br>"
-            f"|t| = {np.linalg.norm(t):.4f} m{warn}"
+            f"|t| = {np.linalg.norm(t):.4f} m{warn}{symmetry}"
         )
 
         c = coverage(scenes)
@@ -297,6 +405,30 @@ class CalibrateStep(StepPage):
             f"<tr><td>높이</td><td>{bar(c['z_range'], 1.0)}</td><td>{c['z_range']:.2f} m</td></tr>"
             f"<tr><td>기울기</td><td>{bar(c['tilt_range'], 30)}</td>"
             f"<td>{c['tilt_min']:.0f}~{c['tilt_max']:.0f}°</td></tr></table>"
+        )
+
+    def _symmetry_html(self) -> str:
+        if not self.symmetry_gate:
+            return ""
+        if "error" in self.symmetry_gate:
+            return (
+                "<br><br><b>Correspondence symmetry</b><br>"
+                f"<span style='color:#d9534f'>diagnostic failed: {self.symmetry_gate['error']}</span>"
+            )
+        decision = self.symmetry_gate.get("decision")
+        if decision is None:
+            return ""
+        colour = "#2e9e4f" if decision.status == "CALIBRATION_ACCEPTABLE" else "#d9534f"
+        selected = decision.preferred_candidate_name or "None"
+        out_dir = self.symmetry_gate.get("out_dir")
+        return (
+            "<br><br><b>Correspondence symmetry</b><br>"
+            f"<span style='color:{colour}'>{decision.status}</span><br>"
+            f"Selection source: {decision.selection_source}<br>"
+            f"Selected candidate: {selected}<br>"
+            f"Confidence: {decision.confidence}<br>"
+            f"<span style='color:palette(mid)'>{decision.reason}</span><br>"
+            f"<span style='color:palette(mid)'>Evidence: {out_dir}</span>"
         )
 
     # ------------------------------------------------------------------ state

@@ -156,6 +156,47 @@ def test_evaluate_multiframe_consistency_separates_outliers_and_missing():
     assert min(misaligned_means) > max(aligned_means)
 
 
+def test_evaluate_multiframe_consistency_reports_penalty_inclusive_and_matched_only_together():
+    """Requirement 6: the existing per-frame/aggregate mean_px/median_px/
+    std_px/p95_px stay exactly what they were (penalty-inclusive, unchanged),
+    while a parallel matched-only family and per-frame match-rate aggregates
+    (mean/median/min/p5) become available alongside them -- neither replaces
+    the other."""
+    result = evaluate_multiframe_consistency(
+        frame_loader=_frame_loader,
+        n_total_timeline=40,
+        n_samples=40,
+        sol=_identity_solution(),
+        camera=_camera(),
+        edge_params=EdgeAlignmentParams(depth_jump_threshold_m=1.0),
+        hampel_k=3.0,
+        top_k_worst=10,
+    )
+    assert result.n_valid > 0
+
+    # Existing penalty-inclusive fields untouched in kind.
+    assert np.isfinite(result.mean_px) and np.isfinite(result.p95_px)
+
+    # Every valid frame's own per-frame matched-only pair is populated.
+    for f in result.frame_results:
+        if f.ok:
+            assert np.isfinite(f.matched_mean_px) or f.match_rate == 0.0
+            assert 0.0 <= f.match_rate <= 1.0
+
+    # Aggregate matched-only family, distinct from the penalty-inclusive one.
+    assert np.isfinite(result.matched_mean_px)
+    assert np.isfinite(result.matched_median_px)
+    assert np.isfinite(result.matched_std_px)
+    assert np.isfinite(result.matched_p95_px)
+    assert np.isfinite(result.matched_max_px)
+
+    # Match-rate aggregate ordering: min <= p5 <= median, and all in [0, 1] --
+    # standard percentile monotonicity over the same per-frame match_rate values.
+    assert 0.0 <= result.match_rate_min <= result.match_rate_p5 + 1e-9
+    assert result.match_rate_p5 <= result.match_rate_median + 1e-9 <= 1.0 + 1e-9
+    assert 0.0 <= result.match_rate_mean <= 1.0
+
+
 def test_evaluate_multiframe_consistency_respects_cancel():
     calls = []
 

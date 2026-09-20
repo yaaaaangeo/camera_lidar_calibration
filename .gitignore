@@ -16,3 +16,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# bag 파일
+rosbag2_2026_09_14-11_23_03/

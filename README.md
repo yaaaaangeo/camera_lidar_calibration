@@ -11,12 +11,20 @@ GUI 마법사로 진행하는 도구. 알고리즘은 [FAST-Calib](https://githu
 - **Python**: x86_64 개발 머신은 **3.10**, Jetson Orin(aarch64) 배포 대상은
   **3.8** — Orin은 JetPack의 기본 ROS Noetic이 3.8을 쓰기 때문에 의도적으로
   맞춘 것이지 미지원이 아니다. 두 조합 모두 `requirements.txt` 하나로 설치된다
-- OS: Linux
+- **OS**: 배포 대상(차량에 올라가는 Jetson Orin)은 **Linux(aarch64)뿐**이다.
+  개발 머신은 **Linux 또는 Windows** 모두 가능 — GUI는 PySide6/Qt6라
+  Windows에서도 그대로 뜬다. 다만 Windows는 `python3.10` 같은 버전별 실행
+  파일 이름을 쓰지 않으므로 설치 방법이 다르다 (2번 참고)
 - **ROS 불필요.** `rosbags`가 순수 파이썬으로 `.bag`/ROS2 bag 폴더를 직접 읽으므로
   `source /opt/ros/...`도 `roscore`도 필요 없다
-- 시스템 라이브러리: Qt6 xcb 플러그인(`libxcb-cursor0` 등) — 아래 설치 스크립트가 처리
+- 시스템 라이브러리: Linux는 Qt6 xcb 플러그인(`libxcb-cursor0` 등) — 아래 설치
+  스크립트가 처리. Windows는 별도로 필요한 것이 없다 (xcb는 X11/Linux 전용)
 
-## 2. 설치 (한 번에)
+## 2. 설치
+
+### Linux (x86_64 개발 머신 / Jetson Orin aarch64 배포 대상)
+
+**한 번에:**
 
 ```bash
 cd camera_lidar_calibration
@@ -35,6 +43,64 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 sudo apt install -y libxcb-cursor0   # Qt 6.5+ xcb 플러그인
+```
+
+### Windows (x86_64 개발 머신)
+
+`scripts/setup_env.sh`는 bash 스크립트라 PowerShell에서 그대로 실행되지 않고,
+Windows Python은 리눅스처럼 `python3.10`이라는 버전별 실행 파일 이름을 쓰지
+않는다(그냥 `python.exe` 하나뿐이거나, Anaconda 등 배포판의 버전과 섞여
+있는 경우가 많다) — 그래서 `python3.10 -m venv .venv`가 그대로는 동작하지
+않는다. 둘 중 하나로 3.10 환경을 만든다.
+
+**conda가 있으면 (권장 — 별도 설치 없이 바로 됨):**
+
+```powershell
+conda create -n camera_lidar_calib python=3.10 -y
+conda activate camera_lidar_calib
+python -m pip install -r requirements.txt
+```
+
+**conda가 없으면:** [python.org](https://www.python.org/downloads/)에서 3.10.x용
+Windows installer를 받는다 — 설치 중 "Add python.exe to PATH"와 "py launcher"를
+체크해야 `py -3.10`이 인식된다.
+
+```powershell
+py -3.10 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+**`pip install ...`이 아니라 `python -m pip install ...`을 쓰는 이유** — Anaconda를
+같이 쓰는 머신에서는 `conda activate`로 들어가도 `pip` 명령이 이 프로젝트 환경이
+아니라 base Anaconda 환경의 `pip.exe`로 잘못 풀리는 경우가 있다(`where.exe pip`로
+보면 이 환경 것이 먼저 나오는데도 실제로는 다른 게 실행됨 — PATH 우선순위 꼬임).
+그러면 겉으로는 "Successfully installed ..."가 그대로 뜨는데 정작 패키지는
+`camera_lidar_calib`가 아니라 엉뚱한 환경에 깔려서, `python gui/app.py`가
+`ModuleNotFoundError`로 죽는다. `python -m pip`는 지금 활성화된 `python`에
+확실히 묶여서 이 문제를 피한다. 의심되면 확인:
+
+```powershell
+python -m pip list | Select-String "PySide6|numpy|opencv|rosbags|open3d|pyqtgraph"
+```
+
+실행할 때마다 새 터미널에서는 `conda activate camera_lidar_calib` (또는
+`.venv\Scripts\Activate.ps1`)부터 다시 해야 한다 — 이 활성화는 그 셸 세션에만
+적용되고 재부팅/새 창마다 초기화된다.
+
+**`python -m pip install -r requirements.txt`가 `UnicodeDecodeError: 'cp949'
+codec can't decode byte ...`로 죽으면** — 한국어 Windows에서 자주 나는 문제다.
+`requirements.txt`는 UTF-8(한글 주석 포함)인데, pip가 파일 인코딩을 못 정하면
+시스템 로캘(cp949)로 읽으려다가 깨진다. 아래 중 하나로 고친다:
+
+```powershell
+# 지금 이 창만 임시로 (창 닫으면 다시 걸린다)
+$env:PYTHONUTF8 = "1"
+python -m pip install -r requirements.txt
+
+# 또는 한 번만 실행하면 이후 모든 새 터미널에 영구 적용
+setx PYTHONUTF8 1
+# 이 setx는 지금 열려있는 창에는 즉시 반영되지 않는다 -- 반드시 창을 새로 열고 다시 시도
 ```
 
 `requirements.txt`가 설치하는 것:
@@ -68,10 +134,24 @@ pip install /tmp/open3d.whl
 pip install --default-timeout=180 --retries 5 -r requirements.txt   # 나머지
 ```
 
+이 트릭은 Jetson Orin(aarch64) 배포 대상 얘기라 Linux 전용이다. Windows에서 같은
+문제(느린 회선에서 큰 wheel 다운로드가 끊김)를 겪으면 `wget -c` 대신
+`curl.exe -C - -o open3d.whl "<URL>"`(Windows 10/11에 기본 포함)로 이어받으면 된다.
+
 ## 3. 실행
+
+**Linux:**
 
 ```bash
 source .venv/bin/activate
+python gui/app.py                          # 새 프로젝트
+python gui/app.py 내프로젝트.calib.yaml    # 이어서 작업
+```
+
+**Windows:**
+
+```powershell
+conda activate camera_lidar_calib          # 또는 .venv\Scripts\Activate.ps1
 python gui/app.py                          # 새 프로젝트
 python gui/app.py 내프로젝트.calib.yaml    # 이어서 작업
 ```
@@ -105,7 +185,8 @@ camera_lidar_calibration/
 │   │                       #   (ROS·Qt에 의존하지 않아 headless 테스트/스크립트에서도 재사용)
 │   ├── config/             # 카메라 intrinsics·타겟 치수 프리셋 (yaml, 코드 아님)
 │   ├── check_*.py          # 진단/회귀 스크립트 (8번 참고)
-│   └── README.md           # 단계별 조작법·판단 기준 상세 문서
+│   ├── README.md           # 단계별 조작법·판단 기준 상세 문서
+│   └── EVALUATION.md       # 7단계 "정량 평가" 탭 상세 가이드
 ├── src/, include/          # 원본 FAST-Calib 알고리즘 (C++, 참조용 — 건드리지 않음)
 ├── launch/, CMakeLists.txt,
 │   package.xml             # 원본 ROS1 노드 빌드/실행 설정
@@ -130,7 +211,7 @@ camera_lidar_calibration/
 | 4. Scene 캡처 | 타임라인에서 시점 기록(자르지 않음), 자동 추천 | 동작 |
 | 5. 거리 필터 | 3D 박스로 보드만 남기고 원 검출(5가지 방식 비교) | 동작 |
 | 6. 캘리브레이션 | scene들을 합쳐 extrinsic 계산, scene별 영향도 확인 | 동작 |
-| 7. 검증 | extrinsic으로 포인트클라우드를 이미지에 투영해 확인 | 미구현 |
+| 7. 검증 | extrinsic 투영 오버레이 + 정량 평가(Multi-frame Consistency, Perturbation Sensitivity/Fine Scan, Independent Hold-out Validation, Diagnostic Evidence) + Candidate A/B Test Package Export | 동작 |
 
 각 단계의 세부 조작법, 경고 값이 뜨는 이유, 알려진 함정은
 **[gui/README.md](gui/README.md)**에 정리되어 있다.
@@ -149,7 +230,11 @@ camera_lidar_calibration/
 
 ## 8. 알려진 제약
 
-- **7단계(투영 검증)는 아직 구현되지 않았다.**
+- **7단계는 검증 전용이다.** Candidate를 찾아서(Perturbation Sensitivity/Fine
+  Scan) Hold-out 데이터로 독립 검증하고, 그 결과를 패키지로 내보낼 수는
+  있지만(Candidate A/B Test Package Export), **candidate를 현재 extrinsic에
+  자동 적용하거나 baseline calibration YAML을 덮어쓰는 기능은 의도적으로
+  없다** — 항상 사람이 내보낸 패키지를 보고 판단한다
 - `gui/core/detect_auto.py`(스윕 수 자동 선택)는 미연결 상태다 — 연결 조건은
   파일 상단 주석에 근거(측정치)와 함께 남아 있다
 - **두 조합을 함께 지원한다:** x86_64+python3.10(개발)과 Jetson Orin
@@ -165,6 +250,10 @@ camera_lidar_calibration/
 - `scripts/setup_env.sh`는 아키텍처로 필요한 파이썬을 판단하지만, 해당 파이썬
   자체가 없으면(예: 이 시스템에 3.8/3.10이 아예 없는 경우) 설치까지 자동화하지
   않고 안내만 출력한다
+- `scripts/setup_env.sh`는 bash 스크립트라 **Windows에서는 실행되지 않는다**
+  (Git Bash로 돌려도 `apt`/`sudo` 부분이 의미가 없다) — Windows는 2번의 conda/
+  `py -3.10` 수동 절차를 따른다. Jetson Orin(aarch64) 배포는 애초에 Linux
+  전용이라 해당 없음
 - 원본 FAST-Calib(ROS1 C++, `src/`)은 그대로 유지되며 GUI와 무관하게
   `roslaunch`로 독립 실행할 수 있다 — [README.fastcalib.md](README.fastcalib.md) 참고
 

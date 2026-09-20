@@ -187,6 +187,8 @@ class LidarDetection:
     filtered: np.ndarray = field(default_factory=lambda: np.empty((0, 3), np.float32))
     plane: np.ndarray = field(default_factory=lambda: np.empty((0, 3), np.float32))
     edges: np.ndarray = field(default_factory=lambda: np.empty((0, 3), np.float32))
+    filtered_indices: np.ndarray | None = None
+    plane_indices: np.ndarray | None = None
     plane_rms: float = 0.0
     n_clusters: int = 0  # boundary method: clusters fitted; occupancy: hole candidates
     spacing: float = 0.0  # median nearest-neighbour distance after voxelising
@@ -1227,13 +1229,16 @@ def detect(
     walks_rings = method == "ring" or (method == "original" and ring is not None)
 
     keep = region_mask(xyz, box)
+    keep_indices = np.flatnonzero(keep)
     if walks_rings:
         # The ring walk reads points in acquisition order, so this path must not
         # voxelise -- that reorders them and the walk stops meaning anything.
         filtered = xyz[keep]
+        filtered_indices = keep_indices
         ring_in = np.asarray(ring)[keep]
     else:
         filtered = voxel_down(xyz[keep], params.voxel)
+        filtered_indices = None
         ring_in = None
     if len(filtered) < 50:
         return LidarDetection(False, filtered=filtered, method=params.method,
@@ -1255,6 +1260,7 @@ def detect(
                               reason="평면을 찾지 못했습니다")
 
     plane = filtered[inliers]
+    plane_indices = None if filtered_indices is None else filtered_indices[inliers]
     residual = plane.astype(np.float64) @ normal + d
     plane_rms = float(np.sqrt((residual**2).mean()))
 
@@ -1284,7 +1290,8 @@ def detect(
         pairs = pair_id[edge_mask]
         if len(edges_xy) < params.cluster_min:
             return LidarDetection(
-                False, filtered=filtered, plane=plane, plane_rms=plane_rms, spacing=spacing,
+                False, filtered=filtered, plane=plane, plane_indices=plane_indices,
+                edges=edges_world, plane_rms=plane_rms, spacing=spacing,
                 method=method, reason=f"경계점이 너무 적습니다 ({len(edges_xy)})",
             )
         # Group by crossing, not by distance. Each crossing's midpoint lies on
@@ -1302,7 +1309,8 @@ def detect(
         both = np.flatnonzero((first >= 0) & (second >= 0))
         if len(both) < max(int(params.min_rings_per_hole), 3):
             return LidarDetection(
-                False, filtered=filtered, plane=plane, edges=edges_world, plane_rms=plane_rms,
+                False, filtered=filtered, plane=plane, plane_indices=plane_indices,
+                edges=edges_world, plane_rms=plane_rms,
                 spacing=spacing, method=method,
                 reason=f"구멍을 지나는 링이 너무 적습니다 ({len(both)})",
             )
@@ -1345,7 +1353,8 @@ def detect(
         edges_world = plane[edge_mask]
         if len(edges_xy) < 3:
             return LidarDetection(
-                False, filtered=filtered, plane=plane, plane_rms=plane_rms, spacing=spacing,
+                False, filtered=filtered, plane=plane, plane_indices=plane_indices,
+                plane_rms=plane_rms, spacing=spacing,
                 method=method, ring_gap=gap_used,
                 reason=f"경계점이 너무 적습니다 ({len(edges_xy)})",
             )
@@ -1437,7 +1446,8 @@ def detect(
         edges_world = plane[edge_mask]
         if len(edges_xy) < params.cluster_min:
             return LidarDetection(
-                False, filtered=filtered, plane=plane, plane_rms=plane_rms, spacing=spacing,
+                False, filtered=filtered, plane=plane, plane_indices=plane_indices,
+                plane_rms=plane_rms, spacing=spacing,
                 method=params.method, reason=f"경계점이 너무 적습니다 ({len(edges_xy)})",
             )
 
@@ -1492,7 +1502,9 @@ def detect(
         ok=len(centers) == 4,
         centers=np.array(centers) if centers else None,
         filtered=filtered,
+        filtered_indices=filtered_indices,
         plane=plane,
+        plane_indices=plane_indices,
         edges=edges_world,
         plane_rms=plane_rms,
         spacing=spacing,

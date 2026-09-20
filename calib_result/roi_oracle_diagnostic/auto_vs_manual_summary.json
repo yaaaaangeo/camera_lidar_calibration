@@ -1,0 +1,420 @@
+{
+  "frames": [
+    {
+      "auto": {
+        "best_board_likeness_score": 0.2815286072531218,
+        "best_boundary_count": 0,
+        "best_circle_count": 0,
+        "best_plane_height_m": 1.8021253623061617,
+        "best_plane_index": 2,
+        "best_plane_width_m": 5.280681432351292,
+        "board_like": false,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 5,
+        "projection": {
+          "camera_bbox": [
+            2317.751220703125,
+            1040.861572265625,
+            2538.3974609375,
+            1200.689697265625
+          ],
+          "centroid_distance_px": 594.6938902732164,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            725.7535156510341,
+            1363.4109229414635,
+            3713.707536461292,
+            1997.3044874174893
+          ],
+          "roi_center_px": [
+            2224.3614674223927,
+            1679.4901310338491
+          ]
+        },
+        "roi_point_count": 737
+      },
+      "frame_index": 407,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.6799969865293483,
+        "best_boundary_count": 10,
+        "best_circle_count": 1,
+        "best_plane_height_m": 0.3544945046109863,
+        "best_plane_index": 1,
+        "best_plane_width_m": 0.5085930287172588,
+        "board_like": true,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 4,
+        "projection": {
+          "camera_bbox": [
+            2887.337890625,
+            1051.386962890625,
+            3108.07763671875,
+            1219.024658203125
+          ],
+          "centroid_distance_px": 102.52983125118848,
+          "iou": 0.010892611994336528,
+          "overlap_ratio": 1.0,
+          "roi_bbox": [
+            2074.136859890566,
+            156.25211520189498,
+            3832.1895844664064,
+            2088.613235236836
+          ],
+          "roi_center_px": [
+            2902.0894534806225,
+            1172.2126349522007
+          ]
+        },
+        "roi_point_count": 494
+      },
+      "frame_index": 519,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.6502227553717717,
+        "best_boundary_count": 26,
+        "best_circle_count": 2,
+        "best_plane_height_m": 1.4800958105573212,
+        "best_plane_index": 1,
+        "best_plane_width_m": 1.8240614652809046,
+        "board_like": true,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 4,
+        "projection": {
+          "camera_bbox": [
+            2942.051025390625,
+            1051.429443359375,
+            3163.0,
+            1223.4195556640625
+          ],
+          "centroid_distance_px": 894.6529338716864,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            3666.005488710244,
+            1458.4177673423985,
+            3839.0,
+            1817.7680325826677
+          ],
+          "roi_center_px": [
+            3794.213617762444,
+            1637.727034871219
+          ]
+        },
+        "roi_point_count": 483
+      },
+      "frame_index": 548,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.266944327445968,
+        "best_boundary_count": 0,
+        "best_circle_count": 0,
+        "best_plane_height_m": 0.2881698324350055,
+        "best_plane_index": 1,
+        "best_plane_width_m": 14.119222557670362,
+        "board_like": false,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 2,
+        "projection": {
+          "camera_bbox": [
+            2333.76953125,
+            1037.8970947265625,
+            2569.0,
+            1213.99951171875
+          ],
+          "centroid_distance_px": 262.251574896174,
+          "iou": 0.006987494110714727,
+          "overlap_ratio": 1.0,
+          "roi_bbox": [
+            821.4433308043922,
+            0.0,
+            3567.3438138587444,
+            2159.0
+          ],
+          "roi_center_px": [
+            2189.1380012870795,
+            1127.5367395023904
+          ]
+        },
+        "roi_point_count": 311
+      },
+      "frame_index": 400,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.7594813738584336,
+        "best_boundary_count": 118,
+        "best_circle_count": 4,
+        "best_plane_height_m": 1.6753026571760392,
+        "best_plane_index": 1,
+        "best_plane_width_m": 2.1427930195992855,
+        "board_like": false,
+        "circle_ge4": true,
+        "full_target_success": true,
+        "label": "AUTO",
+        "plane_candidate_count": 5,
+        "projection": {
+          "camera_bbox": [
+            1427.8675537109375,
+            1035.99169921875,
+            1687.07421875,
+            1223.16552734375
+          ],
+          "centroid_distance_px": 1574.3917939313299,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            2797.7093585831212,
+            1653.9972277664433,
+            3128.797782006368,
+            2041.7966648305114
+          ],
+          "roi_center_px": [
+            2962.6934187086144,
+            1839.5498486239346
+          ]
+        },
+        "roi_point_count": 2383
+      },
+      "frame_index": 260,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.663122871371689,
+        "best_boundary_count": 57,
+        "best_circle_count": 3,
+        "best_plane_height_m": 2.002484330152304,
+        "best_plane_index": 4,
+        "best_plane_width_m": 2.032945782603189,
+        "board_like": false,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 5,
+        "projection": {
+          "camera_bbox": [
+            1433.5960693359375,
+            1037.8118896484375,
+            1690.14990234375,
+            1221.10986328125
+          ],
+          "centroid_distance_px": 1575.5447873093551,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            2805.6241057330362,
+            1659.6799776414778,
+            3129.561737624442,
+            2040.9202794835292
+          ],
+          "roi_center_px": [
+            2967.0420127596726,
+            1842.0907822384245
+          ]
+        },
+        "roi_point_count": 2361
+      },
+      "frame_index": 267,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.7405082689638268,
+        "best_boundary_count": 136,
+        "best_circle_count": 6,
+        "best_plane_height_m": 1.8724978325213533,
+        "best_plane_index": 1,
+        "best_plane_width_m": 2.3984045844880404,
+        "board_like": false,
+        "circle_ge4": true,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 5,
+        "projection": {
+          "camera_bbox": [
+            1443.8060302734375,
+            973.5162353515625,
+            1706.0,
+            1164.4173583984375
+          ],
+          "centroid_distance_px": 1656.2863980438597,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            2919.970295444595,
+            1730.3810252449953,
+            3146.909583265712,
+            1984.9858797200968
+          ],
+          "roi_center_px": [
+            3033.51853430604,
+            1853.648515524998
+          ]
+        },
+        "roi_point_count": 1841
+      },
+      "frame_index": 274,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.4183928749154188,
+        "best_boundary_count": 21,
+        "best_circle_count": 2,
+        "best_plane_height_m": 5.245599645082857,
+        "best_plane_index": 2,
+        "best_plane_width_m": 21.554012747413807,
+        "board_like": false,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 5,
+        "projection": {
+          "camera_bbox": [
+            1841.3892822265625,
+            921.922119140625,
+            2159.032470703125,
+            1144.0985107421875
+          ],
+          "centroid_distance_px": 574.7080565030052,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            205.9443124341442,
+            1214.8622370654748,
+            3839.0,
+            2004.6060318421275
+          ],
+          "roi_center_px": [
+            2036.996838498096,
+            1606.5398636193706
+          ]
+        },
+        "roi_point_count": 895
+      },
+      "frame_index": 0,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.5271863101133408,
+        "best_boundary_count": 17,
+        "best_circle_count": 1,
+        "best_plane_height_m": 0.5463043018640086,
+        "best_plane_index": 2,
+        "best_plane_width_m": 1.940702141745577,
+        "board_like": false,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 5,
+        "projection": {
+          "camera_bbox": [
+            1844.98779296875,
+            927.47412109375,
+            2162.154052734375,
+            1145.1611328125
+          ],
+          "centroid_distance_px": 1093.5955505212637,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            2472.472478890757,
+            1266.8564140923038,
+            3437.5887658189304,
+            1955.3804504678005
+          ],
+          "roi_center_px": [
+            2949.1689117466185,
+            1585.6769551869609
+          ]
+        },
+        "roi_point_count": 487
+      },
+      "frame_index": 28,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    },
+    {
+      "auto": {
+        "best_board_likeness_score": 0.5935367234393705,
+        "best_boundary_count": 26,
+        "best_circle_count": 2,
+        "best_plane_height_m": 1.3636928526387053,
+        "best_plane_index": 1,
+        "best_plane_width_m": 2.194929343792947,
+        "board_like": false,
+        "circle_ge4": false,
+        "full_target_success": false,
+        "label": "AUTO",
+        "plane_candidate_count": 4,
+        "projection": {
+          "camera_bbox": [
+            3266.84619140625,
+            991.0,
+            3487.0,
+            1174.200439453125
+          ],
+          "centroid_distance_px": 650.4087526175521,
+          "iou": 0.0,
+          "overlap_ratio": 0.0,
+          "roi_bbox": [
+            3639.840296983758,
+            1375.5056914734973,
+            3839.0,
+            1773.2709382832732
+          ],
+          "roi_center_px": [
+            3800.624814877956,
+            1576.0659213207186
+          ]
+        },
+        "roi_point_count": 515
+      },
+      "frame_index": 653,
+      "manual": null,
+      "roi_case": "NO_MANUAL_ROI"
+    }
+  ],
+  "summary": {
+    "auto_board_like": 2,
+    "auto_boundary_success": 8,
+    "auto_circle_ge1": 8,
+    "auto_circle_ge4": 2,
+    "auto_full_target": 1,
+    "case_counts": {
+      "NO_MANUAL_ROI": 10
+    },
+    "manual_board_like": 0,
+    "manual_boundary_success": 0,
+    "manual_circle_ge1": 0,
+    "manual_circle_ge4": 0,
+    "manual_full_target": 0,
+    "n_frames": 10
+  }
+}

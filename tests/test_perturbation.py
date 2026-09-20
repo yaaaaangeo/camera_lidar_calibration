@@ -13,6 +13,7 @@ import time
 
 import cv2
 import numpy as np
+import pytest
 
 import gui.core.evaluation.perturbation as pert_mod
 from gui.core.evaluation.edge_alignment import EdgeAlignmentParams
@@ -250,6 +251,36 @@ def test_evaluate_perturbation_grid_baseline_matches_direct_evaluation():
     assert np.isclose(baseline.p95_px, direct.p95_px)
 
 
+def test_evaluate_perturbation_grid_point_carries_matched_only_and_penalty_inclusive_together():
+    """Requirement 7: Perturbation Sensitivity must not lose its existing
+    (penalty-inclusive) numbers when the new matched-only/match-rate/signed-
+    delta fields are added alongside them -- both families must be readable
+    off the same PerturbationPoint, matching what evaluate_edge_alignment
+    itself (which _pool_for_spatial's aggregate_point_stats call mirrors)
+    would report for the same pooled points."""
+    image, cloud = _make_scene()
+    frames = _frames_from_single_scene(image, cloud, n=1)
+    camera = _camera()
+    R, t = np.eye(3), np.zeros(3)
+
+    result = evaluate_perturbation_grid(
+        frames, R, t, camera, edge_params=EdgeAlignmentParams(depth_jump_threshold_m=1.0),
+    )
+    baseline = result.axes["yaw"].baseline
+    assert baseline.ok
+    # Existing (penalty-inclusive) fields are still there, unchanged in kind.
+    assert np.isfinite(baseline.mean_px)
+    assert np.isfinite(baseline.match_rate)
+    # New matched-only family, consistent with the existing one.
+    assert np.isfinite(baseline.matched_mean_px)
+    assert baseline.matched_max_px <= baseline.max_px + 1e-9
+    assert set(baseline.match_rate_by_threshold_px) == {2.0, 3.0, 5.0, 10.0, 15.0}
+    assert baseline.match_rate_by_threshold_px[15.0] == pytest.approx(baseline.match_rate)
+    # Signed delta u/v were computed (this scene has a real aligned edge, so
+    # at least some points must have matched and produced a finite offset).
+    assert np.isfinite(baseline.mean_delta_u_px) or np.isfinite(baseline.mean_delta_v_px)
+
+
 def test_evaluate_perturbation_grid_never_mutates_baseline_arrays():
     image, cloud = _make_scene()
     frames = _frames_from_single_scene(image, cloud, n=1)
@@ -406,7 +437,7 @@ def test_rotation_trial_leaves_translation_untouched(monkeypatch):
     frames = _frames_from_single_scene(image, cloud, n=1)
     baseline_t = np.array([0.01, 0.02, 0.03])
 
-    pert_mod._run_trial_point(
+    pert_mod.run_trial_point(
         "rotation", "yaw", 0.1, frames, np.eye(3), baseline_t, _camera(),
         0.0, 0.0, EdgeAlignmentParams(depth_jump_threshold_m=1.0), 0,
     )
@@ -423,7 +454,7 @@ def test_translation_trial_leaves_rotation_untouched(monkeypatch):
     frames = _frames_from_single_scene(image, cloud, n=1)
     baseline_R = np.eye(3)
 
-    pert_mod._run_trial_point(
+    pert_mod.run_trial_point(
         "translation", "tx", 10.0, frames, baseline_R, np.zeros(3), _camera(),
         0.0, 0.0, EdgeAlignmentParams(depth_jump_threshold_m=1.0), 0,
     )
@@ -599,7 +630,7 @@ def test_make_delta_range_forces_zero_even_off_grid():
 
 def test_evaluate_single_axis_fine_scan_matches_grid_at_shared_deltas():
     """Fine Scan must score a delta identically to the Full/Quick grid --
-    both go through the same _run_trial_point, so this is really a check that
+    both go through the same run_trial_point, so this is really a check that
     evaluate_single_axis wires it the same way, not a second implementation."""
     image, cloud = _make_scene()
     frames = _frames_from_single_scene(image, cloud, n=1)

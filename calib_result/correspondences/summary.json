@@ -1,0 +1,1303 @@
+{
+  "summary": {
+    "scene_count": 6,
+    "pair_count": 24,
+    "fit_stats_mm": {
+      "mean": 40.13865931571099,
+      "median": 36.31158724054497,
+      "rmse": 45.554171899603595,
+      "p95": 79.38289236986812,
+      "max": 79.8182293305779
+    },
+    "delta_rotation_vs_global_deg": {
+      "median": 2.968634940168008,
+      "p90": 6.02282231034256,
+      "p95": 6.785593148618423,
+      "max": 7.548363986894286
+    },
+    "delta_translation_vs_global_mm": {
+      "median": 422.59122068622435,
+      "p90": 1216.2151437926964,
+      "p95": 1343.836727728473,
+      "max": 1471.45831166425
+    },
+    "status_counts": {
+      "SUSPICIOUS": 4,
+      "OK": 2
+    }
+  },
+  "scenes": [
+    {
+      "scene_index": "s01",
+      "camera_timestamp_ns": 1789352584308166399,
+      "lidar_timestamp_ns": 1789352584308166399,
+      "camera_header_stamp_ns": 1789352584251117948,
+      "lidar_header_stamp_ns": 1789352584308166399,
+      "pair_count": 4,
+      "assignment_shift": 2,
+      "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+      "pairs": [
+        {
+          "pair_index": 0,
+          "feature_id": "ordered_0",
+          "correspondence_order": 0,
+          "lidar_xyz": [
+            5.962627480839415,
+            -6.254923770996671,
+            -0.0863354180686905
+          ],
+          "camera_xyz": [
+            0.057508531801338525,
+            -0.5432406538027449,
+            7.7666710831505466
+          ],
+          "pred_camera_xyz": [
+            0.04115078962549894,
+            -0.5562023871909523,
+            7.781485399812597
+          ],
+          "residual_mm": [
+            -16.357742175839586,
+            -12.961733388207385,
+            14.814316662050686
+          ],
+          "residual_norm_mm": 25.59387113513163
+        },
+        {
+          "pair_index": 1,
+          "feature_id": "ordered_1",
+          "correspondence_order": 1,
+          "lidar_xyz": [
+            5.5851905412244545,
+            -6.585900192474186,
+            -0.08163366601326694
+          ],
+          "camera_xyz": [
+            0.5571624527406243,
+            -0.5388219501404281,
+            7.7486035889152625
+          ],
+          "pred_camera_xyz": [
+            0.5423757536270581,
+            -0.550419343087248,
+            7.7538044804837565
+          ],
+          "residual_mm": [
+            -14.786699113566115,
+            -11.59739294681994,
+            5.200891568494015
+          ],
+          "residual_norm_mm": 19.498596537836203
+        },
+        {
+          "pair_index": 2,
+          "feature_id": "ordered_2",
+          "correspondence_order": 2,
+          "lidar_xyz": [
+            5.5789907874974105,
+            -6.573827897638645,
+            -0.4776687536046162
+          ],
+          "camera_xyz": [
+            0.552798154859589,
+            -0.1395096495649275,
+            7.725567974898992
+          ],
+          "pred_camera_xyz": [
+            0.530717424658226,
+            -0.15432536346860615,
+            7.752535414732424
+          ],
+          "residual_mm": [
+            -22.080730201363032,
+            -14.81571390367864,
+            26.96743983343275
+          ],
+          "residual_norm_mm": 37.872243607566446
+        },
+        {
+          "pair_index": 3,
+          "feature_id": "ordered_3",
+          "correspondence_order": 3,
+          "lidar_xyz": [
+            5.950573017609928,
+            -6.247680806244552,
+            -0.4891908441974255
+          ],
+          "camera_xyz": [
+            0.05314423392030326,
+            -0.14392835322724423,
+            7.743635469134276
+          ],
+          "pred_camera_xyz": [
+            0.03692118304416868,
+            -0.15312740365446967,
+            7.779772782299121
+          ],
+          "residual_mm": [
+            -16.223050876134586,
+            -9.199050427225435,
+            36.13731316484525
+          ],
+          "residual_norm_mm": 40.66589862853623
+        }
+      ],
+      "fit_stats_mm": {
+        "mean": 30.907652477267625,
+        "median": 31.733057371349037,
+        "rmse": 32.106322016716135,
+        "p95": 40.246850375390764,
+        "max": 40.66589862853623
+      },
+      "loo_errors_mm": [
+        1.3985420670107414,
+        4.973614716220089,
+        7.583033961002281,
+        6.068106783701301
+      ],
+      "loo_stats_mm": {
+        "mean": 5.005824381983603,
+        "median": 5.520860749960695,
+        "rmse": 5.500388332897856,
+        "p95": 7.355794884407134,
+        "max": 7.583033961002281
+      },
+      "geometry": {
+        "pairwise_distances_m": [
+          0.502022052735096,
+          0.6340494728089763,
+          0.4031008124322204,
+          0.3962675457974825,
+          0.6434279763583218,
+          0.4945483166808352
+        ],
+        "centroid_spread_m": 0.3193881559452766,
+        "singular_values_m": [
+          0.4983879294578855,
+          0.39955556359933103,
+          7.132950554198152e-16
+        ],
+        "condition_indicator": 1.2473557493937495,
+        "rank": 2,
+        "warnings": []
+      },
+      "independent_R": [
+        [
+          -0.7275316024126204,
+          -0.6857790808793767,
+          0.02012013218548252
+        ],
+        [
+          0.001849472210813894,
+          -0.031286748201552375,
+          -0.9995087387509493
+        ],
+        [
+          0.6860716777010003,
+          -0.727136982703541,
+          0.024030427406198672
+        ]
+      ],
+      "independent_t": [
+        0.1085699866950319,
+        -0.836335927019824,
+        -0.8702551694076757
+      ],
+      "delta_rotation_vs_global_deg": 3.246030557415761,
+      "delta_translation_vs_global_mm": 483.9370370055264,
+      "camera_physical_ids": [
+        "BOARD_TOP_LEFT",
+        "BOARD_TOP_RIGHT",
+        "BOARD_BOTTOM_RIGHT",
+        "BOARD_BOTTOM_LEFT"
+      ],
+      "camera_marker_ids": [
+        1,
+        2,
+        4,
+        3
+      ],
+      "camera_board_xy": [
+        [
+          -0.25,
+          0.2
+        ],
+        [
+          0.25,
+          0.2
+        ],
+        [
+          0.25,
+          -0.2
+        ],
+        [
+          -0.25,
+          -0.2
+        ]
+      ],
+      "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+      "status": "SUSPICIOUS",
+      "warnings": []
+    },
+    {
+      "scene_index": "s02",
+      "camera_timestamp_ns": 1789352597188750790,
+      "lidar_timestamp_ns": 1789352597188750790,
+      "camera_header_stamp_ns": 1789352597151346735,
+      "lidar_header_stamp_ns": 1789352597188750790,
+      "pair_count": 4,
+      "assignment_shift": 0,
+      "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+      "pairs": [
+        {
+          "pair_index": 0,
+          "feature_id": "ordered_0",
+          "correspondence_order": 0,
+          "lidar_xyz": [
+            6.772260203476197,
+            -4.156805703101913,
+            -0.13819700566489262
+          ],
+          "camera_xyz": [
+            -1.9945867371457306,
+            -0.5125194301306483,
+            6.846505505760723
+          ],
+          "pred_camera_xyz": [
+            -2.0063412848805724,
+            -0.5163205892206026,
+            6.850636409006808
+          ],
+          "residual_mm": [
+            -11.754547734841747,
+            -3.8011590899543757,
+            4.130903246085005
+          ],
+          "residual_norm_mm": 13.026226026993838
+        },
+        {
+          "pair_index": 1,
+          "feature_id": "ordered_1",
+          "correspondence_order": 1,
+          "lidar_xyz": [
+            6.599704611243003,
+            -4.626506621772548,
+            -0.14213646398690744
+          ],
+          "camera_xyz": [
+            -1.5382036684734572,
+            -0.495093850842595,
+            7.050002050733247
+          ],
+          "pred_camera_xyz": [
+            -1.5544820779755435,
+            -0.5100082569324449,
+            7.0655627134441685
+          ],
+          "residual_mm": [
+            -16.278409502086255,
+            -14.914406089849896,
+            15.560662710921491
+          ],
+          "residual_norm_mm": 27.010374838821217
+        },
+        {
+          "pair_index": 2,
+          "feature_id": "ordered_2",
+          "correspondence_order": 2,
+          "lidar_xyz": [
+            6.5975946302376185,
+            -4.614996879535784,
+            -0.5512905820341185
+          ],
+          "camera_xyz": [
+            -1.5541358282309146,
+            -0.09541410718144502,
+            7.051508301847882
+          ],
+          "pred_camera_xyz": [
+            -1.5689197948282834,
+            -0.10094847260654871,
+            7.0679425622886
+          ],
+          "residual_mm": [
+            -14.783966597368803,
+            -5.534365425103688,
+            16.434260440718162
+          ],
+          "residual_norm_mm": 22.787711277003083
+        },
+        {
+          "pair_index": 3,
+          "feature_id": "ordered_3",
+          "correspondence_order": 3,
+          "lidar_xyz": [
+            6.769247118330353,
+            -4.148108057540212,
+            -0.5389819106163029
+          ],
+          "camera_xyz": [
+            -2.010518896903188,
+            -0.11283968646949832,
+            6.848011756875358
+          ],
+          "pred_camera_xyz": [
+            -2.0180047112060784,
+            -0.11561506947740646,
+            6.854146208290016
+          ],
+          "residual_mm": [
+            -7.4858143028904145,
+            -2.7753830079081387,
+            6.134451414658848
+          ],
+          "residual_norm_mm": 10.068349456427994
+        }
+      ],
+      "fit_stats_mm": {
+        "mean": 18.22316539981153,
+        "median": 17.90696865199846,
+        "rmse": 19.492911272182802,
+        "p95": 26.376975304548495,
+        "max": 27.010374838821217
+      },
+      "loo_errors_mm": [
+        0.6527332493777968,
+        8.701396957844102,
+        8.91350877099683,
+        2.2053775472228008
+      ],
+      "loo_stats_mm": {
+        "mean": 5.118254131360382,
+        "median": 5.453387252533451,
+        "rmse": 6.333535711773751,
+        "p95": 8.88169199902392,
+        "max": 8.91350877099683
+      },
+      "geometry": {
+        "pairwise_distances_m": [
+          0.5004097368585645,
+          0.6411657503907501,
+          0.40089059325123105,
+          0.40932141221928636,
+          0.6442795639157808,
+          0.4975954704023248
+        ],
+        "centroid_spread_m": 0.3213699308351598,
+        "singular_values_m": [
+          0.4989987752368724,
+          0.4051107898983718,
+          1.2210928090708905e-16
+        ],
+        "condition_indicator": 1.2317587871753646,
+        "rank": 2,
+        "warnings": []
+      },
+      "independent_R": [
+        [
+          -0.6961167673090259,
+          -0.7173389970599487,
+          0.029089681474003495
+        ],
+        [
+          -0.03781493433344304,
+          -0.003826715654607741,
+          -0.9992774324423905
+        ],
+        [
+          0.716931989112349,
+          -0.6967138003113805,
+          -0.024462286137743202
+        ]
+      ],
+      "independent_t": [
+        -0.25774310350740803,
+        -0.41037540419925683,
+        -0.9080593420863101
+      ],
+      "delta_rotation_vs_global_deg": 1.5730208995870514,
+      "delta_translation_vs_global_mm": 188.2581791141138,
+      "camera_physical_ids": [
+        "BOARD_TOP_LEFT",
+        "BOARD_TOP_RIGHT",
+        "BOARD_BOTTOM_RIGHT",
+        "BOARD_BOTTOM_LEFT"
+      ],
+      "camera_marker_ids": [
+        1,
+        2,
+        4,
+        3
+      ],
+      "camera_board_xy": [
+        [
+          -0.25,
+          0.2
+        ],
+        [
+          0.25,
+          0.2
+        ],
+        [
+          0.25,
+          -0.2
+        ],
+        [
+          -0.25,
+          -0.2
+        ]
+      ],
+      "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+      "status": "OK",
+      "warnings": []
+    },
+    {
+      "scene_index": "s04",
+      "camera_timestamp_ns": 1789352600309619956,
+      "lidar_timestamp_ns": 1789352600309619956,
+      "camera_header_stamp_ns": 1789352600254226620,
+      "lidar_header_stamp_ns": 1789352600309619956,
+      "pair_count": 4,
+      "assignment_shift": 0,
+      "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+      "pairs": [
+        {
+          "pair_index": 0,
+          "feature_id": "ordered_0",
+          "correspondence_order": 0,
+          "lidar_xyz": [
+            6.723006153344351,
+            -4.158371475952633,
+            0.14166939108387994
+          ],
+          "camera_xyz": [
+            -1.9510145619220063,
+            -0.8121351797902544,
+            6.796099561701834
+          ],
+          "pred_camera_xyz": [
+            -1.9646812791678863,
+            -0.7943292069780629,
+            6.8090519707545365
+          ],
+          "residual_mm": [
+            -13.666717245879978,
+            17.80597281219154,
+            12.95240905270223
+          ],
+          "residual_norm_mm": 25.91518335524293
+        },
+        {
+          "pair_index": 1,
+          "feature_id": "ordered_1",
+          "correspondence_order": 1,
+          "lidar_xyz": [
+            6.542936770725048,
+            -4.6219793378065965,
+            0.16416064110863154
+          ],
+          "camera_xyz": [
+            -1.491602085332514,
+            -0.8101814641526079,
+            6.993422544015391
+          ],
+          "pred_camera_xyz": [
+            -1.5112118461658812,
+            -0.8141262221395333,
+            7.013592040131942
+          ],
+          "residual_mm": [
+            -19.609760833367183,
+            -3.9447579869253957,
+            20.1694961165515
+          ],
+          "residual_norm_mm": 28.406203708219433
+        },
+        {
+          "pair_index": 2,
+          "feature_id": "ordered_2",
+          "correspondence_order": 2,
+          "lidar_xyz": [
+            6.5279886627016595,
+            -4.621449932283227,
+            -0.24844029043425936
+          ],
+          "camera_xyz": [
+            -1.4873604565240617,
+            -0.4104432400173904,
+            6.979589223724372
+          ],
+          "pred_camera_xyz": [
+            -1.508864658488531,
+            -0.4012631305917546,
+            7.014938614068297
+          ],
+          "residual_mm": [
+            -21.50420196446934,
+            9.180109425635797,
+            35.34939034392526
+          ],
+          "residual_norm_mm": 42.3825967689868
+        },
+        {
+          "pair_index": 3,
+          "feature_id": "ordered_3",
+          "correspondence_order": 3,
+          "lidar_xyz": [
+            6.7109083826368074,
+            -4.151135881097471,
+            -0.2645703378083658
+          ],
+          "camera_xyz": [
+            -1.946772933113554,
+            -0.41239695565503687,
+            6.782266241410816
+          ],
+          "pred_camera_xyz": [
+            -1.968940059097961,
+            -0.38787058942777813,
+            6.807414218616955
+          ],
+          "residual_mm": [
+            -22.16712598440718,
+            24.526366227258734,
+            25.147977206139593
+          ],
+          "residual_norm_mm": 41.53727088149527
+        }
+      ],
+      "fit_stats_mm": {
+        "mean": 34.56031367848611,
+        "median": 34.97173729485735,
+        "rmse": 35.35582879319181,
+        "p95": 42.25579788586307,
+        "max": 42.3825967689868
+      },
+      "loo_errors_mm": [
+        8.697526079916825,
+        16.33169798859581,
+        6.954475314930488,
+        12.781525550340582
+      ],
+      "loo_stats_mm": {
+        "mean": 11.191306233445925,
+        "median": 10.739525815128705,
+        "rmse": 11.769700945664724,
+        "p95": 15.799172122857524,
+        "max": 16.33169798859581
+      },
+      "geometry": {
+        "pairwise_distances_m": [
+          0.49785850244560137,
+          0.6361281647500623,
+          0.4064842275162047,
+          0.4128719594665499,
+          0.6585729082016356,
+          0.5048911854174145
+        ],
+        "centroid_spread_m": 0.32373293363398087,
+        "singular_values_m": [
+          0.501999472238671,
+          0.4089114563681845,
+          1.1845203217966791e-15
+        ],
+        "condition_indicator": 1.227648343964885,
+        "rank": 2,
+        "warnings": []
+      },
+      "independent_R": [
+        [
+          -0.700925347044032,
+          -0.712780384487994,
+          0.025451549272103368
+        ],
+        [
+          -0.008685214979706675,
+          -0.027152147261625507,
+          -0.999593581381873
+        ],
+        [
+          0.7131817614829751,
+          -0.7008615301100712,
+          0.012840977369749245
+        ]
+      ],
+      "independent_t": [
+        -0.2012379334564982,
+        -0.7246632301627269,
+        -0.9127271268578312
+      ],
+      "delta_rotation_vs_global_deg": 2.6912393229202554,
+      "delta_translation_vs_global_mm": 361.24540436692223,
+      "camera_physical_ids": [
+        "BOARD_TOP_LEFT",
+        "BOARD_TOP_RIGHT",
+        "BOARD_BOTTOM_RIGHT",
+        "BOARD_BOTTOM_LEFT"
+      ],
+      "camera_marker_ids": [
+        1,
+        2,
+        4,
+        3
+      ],
+      "camera_board_xy": [
+        [
+          -0.25,
+          0.2
+        ],
+        [
+          0.25,
+          0.2
+        ],
+        [
+          0.25,
+          -0.2
+        ],
+        [
+          -0.25,
+          -0.2
+        ]
+      ],
+      "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+      "status": "SUSPICIOUS",
+      "warnings": []
+    },
+    {
+      "scene_index": "s05",
+      "camera_timestamp_ns": 1789352617299289292,
+      "lidar_timestamp_ns": 1789352617299289292,
+      "camera_header_stamp_ns": 1789352617251761886,
+      "lidar_header_stamp_ns": 1789352617299289292,
+      "pair_count": 4,
+      "assignment_shift": 0,
+      "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+      "pairs": [
+        {
+          "pair_index": 0,
+          "feature_id": "ordered_0",
+          "correspondence_order": 0,
+          "lidar_xyz": [
+            7.123943561667446,
+            -7.227974013624003,
+            -0.3883212568961103
+          ],
+          "camera_xyz": [
+            -0.1638217215770244,
+            -0.2881972537490712,
+            9.355119212435069
+          ],
+          "pred_camera_xyz": [
+            -0.1128602492030987,
+            -0.30177149801220626,
+            9.297474444519
+          ],
+          "residual_mm": [
+            50.9614723739257,
+            -13.574244263135082,
+            -57.64476791606832
+          ],
+          "residual_norm_mm": 78.12970652658967
+        },
+        {
+          "pair_index": 1,
+          "feature_id": "ordered_1",
+          "correspondence_order": 1,
+          "lidar_xyz": [
+            6.983320344245573,
+            -7.691223874884049,
+            -0.3971381551686364
+          ],
+          "camera_xyz": [
+            0.2778711523664196,
+            -0.3061081462046271,
+            9.588756977017395
+          ],
+          "pred_camera_xyz": [
+            0.3115899112315922,
+            -0.29163514057543954,
+            9.530267005601951
+          ],
+          "residual_mm": [
+            33.71875886517256,
+            14.473005629187574,
+            -58.489971415443875
+          ],
+          "residual_norm_mm": 69.04708065899376
+        },
+        {
+          "pair_index": 2,
+          "feature_id": "ordered_2",
+          "correspondence_order": 2,
+          "lidar_xyz": [
+            7.003186172754578,
+            -7.732920505364354,
+            -0.7692925465684055
+          ],
+          "camera_xyz": [
+            0.26540125384409424,
+            0.0900415610684807,
+            9.642700568465072
+          ],
+          "pred_camera_xyz": [
+            0.31941198435209656,
+            0.07928747582906165,
+            9.584923926349733
+          ],
+          "residual_mm": [
+            54.01073050800231,
+            -10.75408523941905,
+            -57.77664211533917
+          ],
+          "residual_norm_mm": 79.8182293305779
+        },
+        {
+          "pair_index": 3,
+          "feature_id": "ordered_3",
+          "correspondence_order": 3,
+          "lidar_xyz": [
+            7.156557703962116,
+            -7.2440552319040785,
+            -0.8167663970861974
+          ],
+          "camera_xyz": [
+            -0.1762916200993498,
+            0.10795245352403661,
+            9.409062803882746
+          ],
+          "pred_camera_xyz": [
+            -0.1331533740718444,
+            0.12516242050853577,
+            9.344412108618078
+          ],
+          "residual_mm": [
+            43.138246027505375,
+            17.209966984499157,
+            -64.65069526466749
+          ],
+          "residual_norm_mm": 79.6040428127996
+        }
+      ],
+      "fit_stats_mm": {
+        "mean": 76.64976483224024,
+        "median": 78.86687466969464,
+        "rmse": 76.77809543592394,
+        "p95": 79.78610135291116,
+        "max": 79.8182293305779
+      },
+      "loo_errors_mm": [
+        34.32199687410276,
+        23.456697998918205,
+        28.542882567964945,
+        22.78888918564697
+      ],
+      "loo_stats_mm": {
+        "mean": 27.27761665665822,
+        "median": 25.999790283441577,
+        "rmse": 27.668780990688347,
+        "p95": 33.45512972818209,
+        "max": 34.32199687410276
+      },
+      "geometry": {
+        "pairwise_distances_m": [
+          0.4842035325466749,
+          0.6439661715125367,
+          0.4299854951175584,
+          0.37500953477730786,
+          0.6372274629054605,
+          0.5145540289059259
+        ],
+        "centroid_spread_m": 0.32069162137410406,
+        "singular_values_m": [
+          0.49888129440647766,
+          0.40310038224929096,
+          8.596091615678758e-16
+        ],
+        "condition_indicator": 1.2376105713984478,
+        "rank": 2,
+        "warnings": []
+      },
+      "independent_R": [
+        [
+          -0.7084600519161587,
+          -0.7051146077743048,
+          0.02996238879397733
+        ],
+        [
+          -0.050331652523114286,
+          0.008132782982546832,
+          -0.9986994455767217
+        ],
+        [
+          0.703953890246546,
+          -0.7090467176034645,
+          -0.04125133528150548
+        ]
+      ],
+      "independent_t": [
+        -0.1949918798388342,
+        -0.27472028667566195,
+        -0.7996606523723493
+      ],
+      "delta_rotation_vs_global_deg": 1.002763555217173,
+      "delta_translation_vs_global_mm": 174.5539102366213,
+      "camera_physical_ids": [
+        "BOARD_TOP_LEFT",
+        "BOARD_TOP_RIGHT",
+        "BOARD_BOTTOM_RIGHT",
+        "BOARD_BOTTOM_LEFT"
+      ],
+      "camera_marker_ids": [
+        1,
+        2,
+        4,
+        3
+      ],
+      "camera_board_xy": [
+        [
+          -0.25,
+          0.2
+        ],
+        [
+          0.25,
+          0.2
+        ],
+        [
+          0.25,
+          -0.2
+        ],
+        [
+          -0.25,
+          -0.2
+        ]
+      ],
+      "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+      "status": "OK",
+      "warnings": []
+    },
+    {
+      "scene_index": "s06",
+      "camera_timestamp_ns": 1789352628207273273,
+      "lidar_timestamp_ns": 1789352628207273273,
+      "camera_header_stamp_ns": 1789352628152219360,
+      "lidar_header_stamp_ns": 1789352628207273273,
+      "pair_count": 4,
+      "assignment_shift": 0,
+      "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+      "pairs": [
+        {
+          "pair_index": 0,
+          "feature_id": "ordered_0",
+          "correspondence_order": 0,
+          "lidar_xyz": [
+            6.580107369299996,
+            -10.651715101301967,
+            -0.4998477551038749
+          ],
+          "camera_xyz": [
+            2.661626122597594,
+            -0.19234702331728887,
+            11.37453692198969
+          ],
+          "pred_camera_xyz": [
+            2.669459549445289,
+            -0.19757979344495674,
+            11.3658166855744
+          ],
+          "residual_mm": [
+            7.8334268476951685,
+            -5.232770127667874,
+            -8.720236415291183
+          ],
+          "residual_norm_mm": 12.836938206822339
+        },
+        {
+          "pair_index": 1,
+          "feature_id": "ordered_1",
+          "correspondence_order": 1,
+          "lidar_xyz": [
+            6.106497376515654,
+            -10.833152310869922,
+            -0.48202739526636096
+          ],
+          "camera_xyz": [
+            3.1324218638548222,
+            -0.19332990315377446,
+            11.20616113999809
+          ],
+          "pred_camera_xyz": [
+            3.134948637282334,
+            -0.20046111126394875,
+            11.163690342368003
+          ],
+          "residual_mm": [
+            2.5267734275118414,
+            -7.131208110174287,
+            -42.47079763008621
+          ],
+          "residual_norm_mm": 43.1393945761914
+        },
+        {
+          "pair_index": 2,
+          "feature_id": "ordered_2",
+          "correspondence_order": 2,
+          "lidar_xyz": [
+            6.096809350513025,
+            -10.83781073944784,
+            -0.884782787631998
+          ],
+          "camera_xyz": [
+            3.141029810040092,
+            0.20598623106012293,
+            11.227898854204973
+          ],
+          "pred_camera_xyz": [
+            3.137360688673369,
+            0.2023420911649757,
+            11.17212995167953
+          ],
+          "residual_mm": [
+            -3.669121366722816,
+            -3.644139895147225,
+            -55.76890252544331
+          ],
+          "residual_norm_mm": 56.00814847923061
+        },
+        {
+          "pair_index": 3,
+          "feature_id": "ordered_3",
+          "correspondence_order": 3,
+          "lidar_xyz": [
+            6.557703872853746,
+            -10.66128949675137,
+            -0.9211716423459915
+          ],
+          "camera_xyz": [
+            2.6702340687828636,
+            0.20696911089660852,
+            11.396274636196575
+          ],
+          "pred_camera_xyz": [
+            2.684033109199632,
+            0.22418080719512867,
+            11.369423729495304
+          ],
+          "residual_mm": [
+            13.799040416768271,
+            17.211696298520152,
+            -26.850906701270105
+          ],
+          "residual_norm_mm": 34.750930873523494
+        }
+      ],
+      "fit_stats_mm": {
+        "mean": 36.68385303394196,
+        "median": 38.94516272485745,
+        "rmse": 39.907186820089365,
+        "p95": 54.07783539377473,
+        "max": 56.00814847923061
+      },
+      "loo_errors_mm": [
+        16.39634114770246,
+        7.888559994272395,
+        6.760243180103183,
+        22.284217181168003
+      ],
+      "loo_stats_mm": {
+        "mean": 13.33234037581151,
+        "median": 12.142450570987428,
+        "rmse": 14.776303707682366,
+        "p95": 21.40103577614817,
+        "max": 22.284217181168003
+      },
+      "geometry": {
+        "pairwise_distances_m": [
+          0.507487390489388,
+          0.64527787872184,
+          0.4220277285464149,
+          0.40289882710705605,
+          0.6526651507148052,
+          0.49488145913358145
+        ],
+        "centroid_spread_m": 0.32454211190263277,
+        "singular_values_m": [
+          0.501199187972274,
+          0.4124435762244541,
+          5.648474346465383e-16
+        ],
+        "condition_indicator": 1.2151945547565484,
+        "rank": 2,
+        "warnings": []
+      },
+      "independent_R": [
+        [
+          -0.7589387989616467,
+          -0.6506488523054041,
+          0.025845123801472834
+        ],
+        [
+          -0.0644227512928586,
+          0.0355304439694977,
+          -0.9972899762191479
+        ],
+        [
+          0.6479672897195597,
+          -0.7585470707510453,
+          -0.06888202166383935
+        ]
+      ],
+      "independent_t": [
+        0.7355630209620796,
+        0.10169697853148237,
+        -1.0031845157609194
+      ],
+      "delta_rotation_vs_global_deg": 4.497280633790836,
+      "delta_translation_vs_global_mm": 960.9719759211425,
+      "camera_physical_ids": [
+        "BOARD_TOP_LEFT",
+        "BOARD_TOP_RIGHT",
+        "BOARD_BOTTOM_RIGHT",
+        "BOARD_BOTTOM_LEFT"
+      ],
+      "camera_marker_ids": [
+        1,
+        2,
+        4,
+        3
+      ],
+      "camera_board_xy": [
+        [
+          -0.25,
+          0.2
+        ],
+        [
+          0.25,
+          0.2
+        ],
+        [
+          0.25,
+          -0.2
+        ],
+        [
+          -0.25,
+          -0.2
+        ]
+      ],
+      "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+      "status": "SUSPICIOUS",
+      "warnings": []
+    },
+    {
+      "scene_index": "s07",
+      "camera_timestamp_ns": 1789352651196150036,
+      "lidar_timestamp_ns": 1789352651196150036,
+      "camera_header_stamp_ns": 1789352651136766026,
+      "lidar_header_stamp_ns": 1789352651196150036,
+      "pair_count": 4,
+      "assignment_shift": 2,
+      "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+      "pairs": [
+        {
+          "pair_index": 0,
+          "feature_id": "ordered_0",
+          "correspondence_order": 0,
+          "lidar_xyz": [
+            0.7481571612766938,
+            -11.12817508160912,
+            -0.6088988496890957
+          ],
+          "camera_xyz": [
+            7.176914032495286,
+            0.09731694514994194,
+            7.6073706030286905
+          ],
+          "pred_camera_xyz": [
+            7.164901924359761,
+            0.10856609478849139,
+            7.631138381909052
+          ],
+          "residual_mm": [
+            -12.01210813552489,
+            11.249149638549449,
+            23.767778880361412
+          ],
+          "residual_norm_mm": 28.90919269636865
+        },
+        {
+          "pair_index": 1,
+          "feature_id": "ordered_1",
+          "correspondence_order": 1,
+          "lidar_xyz": [
+            0.24721989385803966,
+            -11.099417116821678,
+            -0.5329773160539238
+          ],
+          "camera_xyz": [
+            7.522690823658849,
+            0.04309748337007835,
+            7.250301057061898
+          ],
+          "pred_camera_xyz": [
+            7.503914574818083,
+            0.05015604348451552,
+            7.258059389692939
+          ],
+          "residual_mm": [
+            -18.776248840765675,
+            7.0585601144371735,
+            7.758332631040865
+          ],
+          "residual_norm_mm": 21.507266600694543
+        },
+        {
+          "pair_index": 2,
+          "feature_id": "ordered_2",
+          "correspondence_order": 2,
+          "lidar_xyz": [
+            0.20540174633599761,
+            -11.08906814505026,
+            -0.9143929054946675
+          ],
+          "camera_xyz": [
+            7.510681186468909,
+            0.4364963908230245,
+            7.178935321380169
+          ],
+          "pred_camera_xyz": [
+            7.519176208611415,
+            0.4328527824386189,
+            7.232682252833479
+          ],
+          "residual_mm": [
+            8.495022142506414,
+            -3.6436083844055833,
+            53.74693145331033
+          ],
+          "residual_norm_mm": 54.535987420302796
+        },
+        {
+          "pair_index": 3,
+          "feature_id": "ordered_3",
+          "correspondence_order": 3,
+          "lidar_xyz": [
+            0.7040249142168952,
+            -11.117600319197146,
+            -0.9944978672206438
+          ],
+          "camera_xyz": [
+            7.164904395305346,
+            0.4907158526028881,
+            7.5360048673469615
+          ],
+          "pred_camera_xyz": [
+            7.181577169571455,
+            0.49552504375823236,
+            7.604105232605372
+          ],
+          "residual_mm": [
+            16.67277426610969,
+            4.809191155344283,
+            68.10036525841045
+          ],
+          "residual_norm_mm": 70.27637917270788
+        }
+      ],
+      "fit_stats_mm": {
+        "mean": 43.807206472518466,
+        "median": 41.722590058335726,
+        "rmse": 47.987621665703436,
+        "p95": 67.91532040984711,
+        "max": 70.27637917270788
+      },
+      "loo_errors_mm": [
+        16.859009346533902,
+        18.363814068104304,
+        20.406809689150702,
+        14.480250894916558
+      ],
+      "loo_stats_mm": {
+        "mean": 17.527470999676368,
+        "median": 17.611411707319103,
+        "rmse": 17.660488462549456,
+        "p95": 20.100360345993742,
+        "max": 20.406809689150702
+      },
+      "geometry": {
+        "pairwise_distances_m": [
+          0.5074733940780547,
+          0.6240508080813643,
+          0.3882603290988045,
+          0.3838407359144294,
+          0.6496173293739281,
+          0.5058220570539111
+        ],
+        "centroid_spread_m": 0.318483425637084,
+        "singular_values_m": [
+          0.5072469756441812,
+          0.38526260566263026,
+          6.462368813348614e-17
+        ],
+        "condition_indicator": 1.3166265507957737,
+        "rank": 2,
+        "warnings": []
+      },
+      "independent_R": [
+        [
+          -0.7232378777683427,
+          -0.6816742213717433,
+          0.1106671951319423
+        ],
+        [
+          -0.036207939526231185,
+          -0.12259857381890868,
+          -0.9917956315757973
+        ],
+        [
+          0.6896491552060429,
+          -0.7213111988696675,
+          0.06398591336219435
+        ]
+      ],
+      "independent_t": [
+        0.20018660386193954,
+        -1.834179654691984,
+        -0.8991895362527176
+      ],
+      "delta_rotation_vs_global_deg": 7.548363986894286,
+      "delta_translation_vs_global_mm": 1471.45831166425,
+      "camera_physical_ids": [
+        "BOARD_TOP_LEFT",
+        "BOARD_TOP_RIGHT",
+        "BOARD_BOTTOM_RIGHT",
+        "BOARD_BOTTOM_LEFT"
+      ],
+      "camera_marker_ids": [
+        1,
+        2,
+        4,
+        3
+      ],
+      "camera_board_xy": [
+        [
+          -0.25,
+          0.2
+        ],
+        [
+          0.25,
+          0.2
+        ],
+        [
+          0.25,
+          -0.2
+        ],
+        [
+          -0.25,
+          -0.2
+        ]
+      ],
+      "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+      "status": "SUSPICIOUS",
+      "warnings": []
+    }
+  ]
+}

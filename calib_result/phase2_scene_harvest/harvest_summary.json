@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "production_solve_changed": false,
+    "yaml_or_extrinsic_written": false,
+    "temporal_correction_applied": false,
+    "deskew_applied": false,
+    "seed_extrinsic_is_diagnostic_only": true,
+    "pairing": "LiDAR board median timestamp -> nearest camera header for final correspondence",
+    "duplicate_thresholds": {
+      "min_time_separation_s": 0.5,
+      "min_translation_separation_m": 0.1,
+      "min_rotation_separation_deg": 5.0
+    }
+  },
+  "total_frames": 696,
+  "raw_valid_scenes": 1,
+  "after_duplicate_removal": 1,
+  "detection_funnel": {
+    "TOTAL_LIDAR_FRAMES": 696,
+    "CAMERA_PAIR_FOUND": 696,
+    "CAMERA_DETECTION_VALID": 696,
+    "CAMERA_PNP_VALID": 696,
+    "CAMERA_PNP_QUALITY_PASS": 696,
+    "LIDAR_ROI_VALID": 190,
+    "LIDAR_PLANE_VALID": 180,
+    "LIDAR_BOUNDARY_VALID": 130,
+    "LIDAR_CIRCLE_GE_1": 43,
+    "LIDAR_CIRCLE_GE_2": 21,
+    "LIDAR_CIRCLE_GE_3": 9,
+    "LIDAR_CIRCLE_GE_4": 3,
+    "LIDAR_GEOMETRY_PASS": 3,
+    "LIDAR_FULL_TARGET_VALID": 1,
+    "TIMESTAMP_VALID": 1,
+    "FOUR_CORRESPONDENCES_CREATED": 1,
+    "FINAL_VALID_SCENES": 1
+  },
+  "failure_reasons": {
+    "LIDAR_ROI_INVALID": 506,
+    "CIRCLE_LT_4": 129,
+    "경계점이 너무 적습니다 (0)": 31,
+    "경계점이 너무 적습니다 (2)": 19,
+    "평면을 찾지 못했습니다": 10
+  },
+  "motion_distribution": {
+    "groups": {
+      "LOW": 0,
+      "MID": 0,
+      "HIGH": 1,
+      "UNKNOWN": 0
+    },
+    "translation_velocity_mm_s": {
+      "p10": 940.7441240548183,
+      "p25": 940.7441240548183,
+      "median": 940.7441240548183,
+      "p75": 940.7441240548183,
+      "p90": 940.7441240548183,
+      "p95": 940.7441240548183,
+      "min": 940.7441240548183,
+      "max": 940.7441240548183
+    },
+    "rotation_velocity_deg_s": {
+      "p10": 21.000191864418483,
+      "p25": 21.000191864418483,
+      "median": 21.000191864418483,
+      "p75": 21.000191864418483,
+      "p90": 21.000191864418483,
+      "p95": 21.000191864418483,
+      "min": 21.000191864418483,
+      "max": 21.000191864418483
+    }
+  },
+  "pose_diversity": {
+    "distance_m": {
+      "p10": 9.766100854826579,
+      "p25": 9.766100854826579,
+      "median": 9.766100854826579,
+      "p75": 9.766100854826579,
+      "p90": 9.766100854826579,
+      "p95": 9.766100854826579,
+      "min": 9.766100854826579,
+      "max": 9.766100854826579
+    },
+    "horizontal_x_m": {
+      "p10": 2.199172602141729,
+      "p25": 2.199172602141729,
+      "median": 2.199172602141729,
+      "p75": 2.199172602141729,
+      "p90": 2.199172602141729,
+      "p95": 2.199172602141729,
+      "min": 2.199172602141729,
+      "max": 2.199172602141729
+    },
+    "vertical_y_m": {
+      "p10": -0.024285962476750217,
+      "p25": -0.024285962476750217,
+      "median": -0.024285962476750217,
+      "p75": -0.024285962476750217,
+      "p90": -0.024285962476750217,
+      "p95": -0.024285962476750217,
+      "min": -0.024285962476750217,
+      "max": -0.024285962476750217
+    },
+    "yaw_deg": {
+      "p10": -0.5499234493332684,
+      "p25": -0.5499234493332684,
+      "median": -0.5499234493332684,
+      "p75": -0.5499234493332684,
+      "p90": -0.5499234493332684,
+      "p95": -0.5499234493332684,
+      "min": -0.5499234493332684,
+      "max": -0.5499234493332684
+    },
+    "pitch_deg": {
+      "p10": -16.13236485489098,
+      "p25": -16.13236485489098,
+      "median": -16.13236485489098,
+      "p75": -16.13236485489098,
+      "p90": -16.13236485489098,
+      "p95": -16.13236485489098,
+      "min": -16.13236485489098,
+      "max": -16.13236485489098
+    },
+    "roll_deg": {
+      "p10": -173.04607457380595,
+      "p25": -173.04607457380595,
+      "median": -173.04607457380595,
+      "p75": -173.04607457380595,
+      "p90": -173.04607457380595,
+      "p95": -173.04607457380595,
+      "min": -173.04607457380595,
+      "max": -173.04607457380595
+    },
+    "translation_range_m": 0.0,
+    "yaw_range_deg": 0.0,
+    "pitch_range_deg": 0.0,
+    "roll_range_deg": 0.0
+  },
+  "temporal_readiness": "INSUFFICIENT",
+  "readiness_reason": "1 independent valid scenes after duplicate removal; need at least 5, preferably 10+.",
+  "scene407_detected": false
+}

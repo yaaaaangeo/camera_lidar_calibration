@@ -56,6 +56,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for page in self.pages:
             page.changed.connect(self._refresh_nav)
+            if isinstance(page, VerifyStep):
+                # Validation exposure history is provenance, not an ordinary
+                # setting a person might want to discard -- persisted the
+                # moment a Hold-out result reveals it, not left waiting for
+                # an explicit "저장…" (see VerifyStep's own docstring and
+                # _autosave_validation_history below).
+                page.validation_history_changed.connect(self._autosave_validation_history)
             # Each page keeps its own natural size and scrolls when the window is
             # smaller, so a laptop screen can still reach every control instead of
             # having the window refuse to fit.
@@ -141,6 +148,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 if hasattr(page, attr):
                     setattr(page, attr, None if attr != "_times" else [])
         self.project_path = Path(path)
+        self._propagate_project_path()
 
         # Steps 1-3 hold their state in widgets, so they have to be told to
         # reread. Going to step 1 alone would only refresh that one, and the
@@ -183,9 +191,46 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.project.save(path)
         self.project_path = Path(path)
+        self._propagate_project_path()
         self.statusBar().showMessage(
             f"저장됨: {Path(path).name}  —  scene {len(self.project.scenes)}개, bag {len(self.project.bag_paths)}개", 8000
         )
+
+    def _propagate_project_path(self):
+        """Mirrors the existing `page.project = loaded` rebinding right
+        above it -- VerifyStep keeps its own `project_path` copy purely to
+        know whether `validation_history_changed` will reach disk yet (see
+        its `_refresh_holdout_persistence_note`); it never guesses a path on
+        its own."""
+        for page in self.pages:
+            if isinstance(page, VerifyStep):
+                page.project_path = self.project_path
+                page._refresh_holdout_persistence_note()
+
+    def _autosave_validation_history(self):
+        """Hold-out/Discovery validation provenance is persisted to disk the
+        moment it changes (see VerifyStep's `validation_history_changed`),
+        but this must touch ONLY the `validation_history` key on disk, never
+        the whole project -- otherwise an unrelated unsaved edit elsewhere
+        (a scene, a filter box the user hasn't pressed "저장…" for yet)
+        would be silently written out too, just because a Hold-out result
+        was revealed. `Project.patch_validation_history` reads the file
+        fresh from disk and replaces only that one key (see its docstring);
+        a full `Project.save` remains exactly what manual "저장…" uses (see
+        `_save` above), unchanged.
+
+        A silent no-op until this project has been saved (or opened from) a
+        file at least once -- there is nowhere yet to write to, and
+        VerifyStep's own note already tells the user so; this never blocks
+        or nags about it. `self.project.validation_history` itself (in
+        memory) is kept current regardless, by VerifyStep, so a later manual
+        save naturally includes the latest history too."""
+        if self.project_path is None:
+            return
+        try:
+            Project.patch_validation_history(self.project_path, self.project.validation_history)
+        except Exception as exc:  # noqa: BLE001 - must never crash the app over an autosave
+            self.statusBar().showMessage(f"Validation history 자동 저장 실패: {type(exc).__name__}: {exc}", 8000)
 
     # ------------------------------------------------------------------- nav
 

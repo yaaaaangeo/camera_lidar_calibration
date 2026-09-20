@@ -25,7 +25,7 @@ filter) -- this module trusts that and does not redo any of it.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import cv2
@@ -54,11 +54,87 @@ class EdgeAlignmentParams:
     min_consistency_displacement_for_angle_check_px: float = 1.5
 
 
+# Fixed distance cut-offs "Within N px" is reported at -- always judged
+# against every LiDAR edge point (matched and unmatched alike), never just
+# the matched subset, so a threshold sweep and `match_rate` (== the 15.0 px
+# entry, since nothing can match past the largest search radius) read on the
+# same denominator. See aggregate_point_stats.
+MATCH_RATE_THRESHOLDS_PX = (2.0, 3.0, 5.0, 10.0, 15.0)
+
+
+def aggregate_point_stats(errors_px: np.ndarray, matched: np.ndarray,
+                            delta_u_px: Optional[np.ndarray] = None,
+                            delta_v_px: Optional[np.ndarray] = None) -> dict:
+    """Everything derived from one frame's (or many frames' pooled) per-point
+    arrays, split cleanly into the two families this module must never
+    blend: **Penalty-inclusive** (`mean_px`/`median_px`/`p95_px`/`max_px` --
+    computed over `errors_px` exactly as before, unmatched points included at
+    the 15px penalty) and **Matched-only** (`matched_*` -- computed over
+    `errors_px[matched]` alone, so an unmatched point can never contribute a
+    15px value to it). Shared by `evaluate_edge_alignment` (one frame) and
+    `perturbation._pool_for_spatial` (many frames' points pooled into one),
+    so the two are never computed two different ways.
+
+    `delta_u_px`/`delta_v_px`, when given, are expected to already be NaN at
+    every unmatched index (see `evaluate_edge_alignment`) -- `np.nanmean`/
+    `np.nanmedian` then average only the matched, signed offsets on their
+    own, with no separate masking needed here.
+    """
+    n = errors_px.shape[0]
+    matched_errors = errors_px[matched] if n else errors_px
+    n_matched_pts = matched_errors.size
+
+    def _pct(arr, q):
+        return float(np.percentile(arr, q)) if arr.size else float("nan")
+
+    stats = {
+        "matched_mean_px": float(np.mean(matched_errors)) if n_matched_pts else float("nan"),
+        "matched_median_px": float(np.median(matched_errors)) if n_matched_pts else float("nan"),
+        "matched_p95_px": _pct(matched_errors, 95),
+        "matched_p99_px": _pct(matched_errors, 99),
+        "matched_max_px": float(np.max(matched_errors)) if n_matched_pts else float("nan"),
+        "match_rate_by_threshold_px": {
+            th: (float(np.sum(matched_errors <= th)) / n) if n else float("nan")
+            for th in MATCH_RATE_THRESHOLDS_PX
+        },
+        "mean_delta_u_px": float("nan"),
+        "median_delta_u_px": float("nan"),
+        "mean_delta_v_px": float("nan"),
+        "median_delta_v_px": float("nan"),
+    }
+    if delta_u_px is not None and delta_u_px.size and np.isfinite(delta_u_px).any():
+        stats["mean_delta_u_px"] = float(np.nanmean(delta_u_px))
+        stats["median_delta_u_px"] = float(np.nanmedian(delta_u_px))
+    if delta_v_px is not None and delta_v_px.size and np.isfinite(delta_v_px).any():
+        stats["mean_delta_v_px"] = float(np.nanmean(delta_v_px))
+        stats["median_delta_v_px"] = float(np.nanmedian(delta_v_px))
+    return stats
+
+
 @dataclass
 class EdgeAlignmentResult:
     """Frame-level pixel-alignment numbers, plus every per-point array
     `spatial_analysis` needs to break them down further without redoing the
-    projection or the edge extraction."""
+    projection or the edge extraction.
+
+    Two families of aggregate, never to be read as the same thing:
+
+      - **Penalty-inclusive** (`mean_px`/`median_px`/`p95_px`/`max_px`,
+        unchanged from before this field split existed): every LiDAR edge
+        point counts, including one that found no correspondence at all --
+        penalised at the largest search radius (15px by default) rather
+        than dropped, so a badly-mismatched scene cannot hide its worst
+        points by having them simply not count. `p95_px`/`max_px` can never
+        exceed that penalty value by construction.
+      - **Matched-only** (`matched_mean_px`/`matched_median_px`/
+        `matched_p95_px`/`matched_p99_px`/`matched_max_px`): the same
+        statistics computed only over points that actually found a
+        correspondence -- never contains the 15px penalty value. Read
+        alongside `match_rate` (and `match_rate_by_threshold_px`), since a
+        low match rate means the matched-only numbers describe a shrinking,
+        possibly biased subset of the scene, not "the rest of the points
+        were fine".
+    """
 
     ok: bool
     reason: str = ""
@@ -72,12 +148,38 @@ class EdgeAlignmentResult:
     n_unmatched: int = 0
     match_rate: float = float("nan")
 
+    # Matched-only -- see the class docstring. NaN when there is not a
+    # single matched point to compute from.
+    matched_mean_px: float = float("nan")
+    matched_median_px: float = float("nan")
+    matched_p95_px: float = float("nan")
+    matched_p99_px: float = float("nan")
+    matched_max_px: float = float("nan")
+
+    # {threshold_px: rate}, rate always over n_edge_points (matched AND
+    # unmatched together) -- see MATCH_RATE_THRESHOLDS_PX. The 15.0 entry is
+    # always exactly `match_rate` above, since nothing can match past the
+    # largest search radius; kept as its own entry rather than a special
+    # case so a caller can iterate the dict without knowing that.
+    match_rate_by_threshold_px: dict = field(default_factory=dict)
+
+    # Signed pixel offset (matched_pixel - lidar_pixel), matched points only
+    # -- unlike every *_px field above, sign is kept on purpose: a systematic
+    # yaw/pitch bias shows up as a nonzero mean here in one axis, which an
+    # unsigned distance can never reveal.
+    mean_delta_u_px: float = float("nan")
+    median_delta_u_px: float = float("nan")
+    mean_delta_v_px: float = float("nan")
+    median_delta_v_px: float = float("nan")
+
     # Per LiDAR-edge-point, aligned arrays -- what spatial_analysis groups by
     # depth bin / image region without ever touching the cloud or image again.
     edge_pixels: Optional[np.ndarray] = None      # (K, 2) uv
     edge_depths: Optional[np.ndarray] = None      # (K,) camera-frame z, metres
     edge_errors_px: Optional[np.ndarray] = None   # (K,) penalised for unmatched
     edge_matched: Optional[np.ndarray] = None     # (K,) bool
+    edge_delta_u_px: Optional[np.ndarray] = None  # (K,) signed, NaN where unmatched
+    edge_delta_v_px: Optional[np.ndarray] = None  # (K,) signed, NaN where unmatched
 
     # Only populated when evaluate_edge_alignment(collect_timing=True) --
     # stage milliseconds, for judging whether a resolution needs a worker
@@ -263,6 +365,14 @@ def evaluate_edge_alignment(
     median_px = float(np.median(errors_px))
     p95_px = float(np.percentile(errors_px, 95))
     max_px = float(np.max(errors_px))
+    # Signed, matched-pixel-minus-lidar-pixel -- correspondence.matched_pixels
+    # is already NaN at every unmatched row, so these come out NaN there too
+    # with no extra masking; see aggregate_point_stats for how the summary
+    # (mean/median) is derived from them, and MatchedOnly's own docstring for
+    # why sign must survive here rather than being collapsed into a distance.
+    delta_u_px = correspondence.matched_pixels[:, 0] - edge_pixels[:, 0]
+    delta_v_px = correspondence.matched_pixels[:, 1] - edge_pixels[:, 1]
+    agg = aggregate_point_stats(errors_px, matched, delta_u_px, delta_v_px)
     if collect_timing:
         timing["aggregation_ms"] = (clock() - t0) * 1000
         timing["total_ms"] = (clock() - t_total0) * 1000
@@ -278,9 +388,21 @@ def evaluate_edge_alignment(
         n_matched=n_matched,
         n_unmatched=n_unmatched,
         match_rate=n_matched / n_edge_points if n_edge_points else float("nan"),
+        matched_mean_px=agg["matched_mean_px"],
+        matched_median_px=agg["matched_median_px"],
+        matched_p95_px=agg["matched_p95_px"],
+        matched_p99_px=agg["matched_p99_px"],
+        matched_max_px=agg["matched_max_px"],
+        match_rate_by_threshold_px=agg["match_rate_by_threshold_px"],
+        mean_delta_u_px=agg["mean_delta_u_px"],
+        median_delta_u_px=agg["median_delta_u_px"],
+        mean_delta_v_px=agg["mean_delta_v_px"],
+        median_delta_v_px=agg["median_delta_v_px"],
         edge_pixels=edge_pixels,
         edge_depths=edge_depths,
         edge_errors_px=errors_px,
         edge_matched=matched,
+        edge_delta_u_px=delta_u_px,
+        edge_delta_v_px=delta_v_px,
         timing_ms=timing if collect_timing else None,
     )

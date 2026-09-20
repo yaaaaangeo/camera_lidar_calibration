@@ -356,6 +356,14 @@ extrinsic 을 엉뚱한 데로 끌고 가므로, 잔차만 봐서는 안 잡힌�
 scene 이 3개 미만이면 경고가 뜬다. 구멍 네 개가 이루는 사각형은 180° 돌려도
 똑같아 보여서, scene 하나만으로는 보드 방향이 뒤집힌 해와 구별되지 않는다.
 
+## 7단계 사용법 — 검증
+
+탭 두 개: **검증**(오버레이로 눈으로 확인 — flip, 캡처, extrinsic 내보내기)과
+**정량 평가**(숫자로 확인 — Multi-frame Consistency, Perturbation Sensitivity, Fine Scan,
+Independent Hold-out Validation, Diagnostic Evidence, Candidate A/B Test Package Export).
+
+정량 평가 탭은 기능이 많아 따로 문서를 뺐다 — **[gui/EVALUATION.md](EVALUATION.md)** 참고.
+
 ## 프로젝트 저장
 
 `프로젝트 → 저장` (Ctrl+S) 하면 파일이 **두 개** 생긴다.

@@ -1,0 +1,65 @@
+{
+  "board_like": true,
+  "detector": {
+    "boundary_point_count": 10,
+    "circle_candidate_count": 1,
+    "circle_count": 1,
+    "ok": false,
+    "plane_point_count": 76,
+    "plane_rms": 0.0053045800113114905,
+    "radii_m": [
+      0.10019958639679277
+    ],
+    "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+  },
+  "hard_reject_reason": "",
+  "index": 1,
+  "plane_equation": {
+    "d": 8.304997767363108,
+    "normal": [
+      -0.14829305232612794,
+      0.6493970848425867,
+      -0.7458502509416689
+    ]
+  },
+  "plane_point_count": 76,
+  "remaining_point_count": 494,
+  "scores": {
+    "area_m2": 0.18029343376372578,
+    "aspect_ratio": 1.4346993313066345,
+    "aspect_similarity": 0.8059179890653185,
+    "boundary_count": 10,
+    "boundary_ratio": 0.13157894736842105,
+    "boundary_support": 1.0,
+    "centroid": [
+      11.499578212436877,
+      -9.935668631603843,
+      0.19775547204833283
+    ],
+    "circle_candidate_count": 1,
+    "circle_count": 1,
+    "circle_support": 0.25,
+    "density_points_per_m2": 421.5350410353705,
+    "height_m": 0.3544945046109863,
+    "normal": [
+      -0.14829305232612794,
+      0.6493970848425867,
+      -0.7458502509416689
+    ],
+    "plane_d": 8.304997767363108,
+    "plane_quality": 0.9693750238767211,
+    "plane_rms_m": 0.005290874065620766,
+    "point_count": 76,
+    "point_density": 0.8147668846448852,
+    "point_ratio": 0.15384615384615385,
+    "radii_m": [
+      0.10019958639679277
+    ],
+    "rectangularity": 0.698137876358156,
+    "size_similarity": 0.5538976634546661,
+    "total_score": 0.6799969865293483,
+    "width_m": 0.5085930287172588
+  },
+  "total_roi_points": 494,
+  "total_score": 0.6799969865293483
+}

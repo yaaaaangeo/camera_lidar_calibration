@@ -1,0 +1,25 @@
+Phase 2 Temporal Offset / Moving Board Diagnostic
+Sign convention: delta_t_ms = t_camera_effective - t_lidar_board. Positive means the camera board pose is sampled later than the LiDAR board observation.
+Valid scenes: 1
+Camera pose samples: 696
+
+HALF_TURN:
+  Best candidate delta_t_ms: 30.0
+  3D RMSE @ 0: 5.893450711064794
+  3D RMSE @ best: 5.893450711064529
+  Rotation spread P95 @ 0/best: 1.2074182697257333e-06 / 1.2074182697257333e-06
+  Translation spread P95 @ 0/best: 0.0 / 0.0
+
+NORMAL:
+  Best candidate delta_t_ms: -9.0
+  3D RMSE @ 0: 5.8934507110647525
+  3D RMSE @ best: 5.893450711064501
+  Rotation spread P95 @ 0/best: 1.2074182697257333e-06 / 0.0
+  Translation spread P95 @ 0/best: 0.0 / 0.0
+
+CURRENT_GLOBAL projection baseline:
+  Median matched mean: 3.7405086645373262
+  Median P95: 9.777430300806484
+
+Final classification: D. INSUFFICIENT_VALID_SCENES
+Reason: Only 1 valid persisted 4-correspondence scene(s); need at least 3 for scene-to-scene consistency, motion/error correlation, and temporal-offset evidence.

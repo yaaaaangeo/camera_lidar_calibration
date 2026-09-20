@@ -1,0 +1,212 @@
+{
+  "scene_index": "s03",
+  "camera_timestamp_ns": 1789352645202841854,
+  "lidar_timestamp_ns": 1789352645202841854,
+  "camera_header_stamp_ns": 1789352645152469551,
+  "lidar_header_stamp_ns": 1789352645202841854,
+  "pair_count": 4,
+  "assignment_shift": 0,
+  "ordering": "Detector centers are unlabeled. Both LiDAR and camera centers are ordered by sort_centers(): fit the board plane, build in-plane axes around the centroid, sort by bearing, then rotate the cycle so a long rectangle edge starts the sequence. solve() may apply a per-scene half-turn roll of 0 or 2 using the upright check. Stored pairs are after that final roll.",
+  "pairs": [
+    {
+      "pair_index": 0,
+      "feature_id": "ordered_0",
+      "correspondence_order": 0,
+      "lidar_xyz": [
+        0.5889034983679842,
+        -11.495987728667322,
+        -0.5226729802140495
+      ],
+      "camera_xyz": [
+        7.569859899166224,
+        0.021946424670236248,
+        7.774652148939769
+      ],
+      "pred_camera_xyz": [
+        7.5422425283294325,
+        0.02304309995007292,
+        7.796139382433234
+      ],
+      "residual_mm": [
+        -27.61737083679172,
+        1.096675279836673,
+        21.48723349346504
+      ],
+      "residual_norm_mm": 35.0088998942978
+    },
+    {
+      "pair_index": 1,
+      "feature_id": "ordered_1",
+      "correspondence_order": 1,
+      "lidar_xyz": [
+        0.08822417919149839,
+        -11.452168480410188,
+        -0.49101712049935
+      ],
+      "camera_xyz": [
+        7.898627885934243,
+        0.004461887255065022,
+        7.398346552611622
+      ],
+      "pred_camera_xyz": [
+        7.870372563240803,
+        0.008817337614207665,
+        7.414392989525384
+      ],
+      "residual_mm": [
+        -28.255322693439666,
+        4.355450359142643,
+        16.046436913761397
+      ],
+      "residual_norm_mm": 32.784468059870775
+    },
+    {
+      "pair_index": 2,
+      "feature_id": "ordered_2",
+      "correspondence_order": 2,
+      "lidar_xyz": [
+        0.07197096431515226,
+        -11.426329967619056,
+        -0.8915238226715261
+      ],
+      "camera_xyz": [
+        7.867785032423401,
+        0.4006834276662463,
+        7.352990083376248
+      ],
+      "pred_camera_xyz": [
+        7.856397071921435,
+        0.40983740557885606,
+        7.396365095751637
+      ],
+      "residual_mm": [
+        -11.387960501965999,
+        9.153977912609745,
+        43.37501237538888
+      ],
+      "residual_norm_mm": 45.76977883477287
+    },
+    {
+      "pair_index": 3,
+      "feature_id": "ordered_3",
+      "correspondence_order": 3,
+      "lidar_xyz": [
+        0.5645756411084695,
+        -11.469975322188075,
+        -0.9139070568307666
+      ],
+      "camera_xyz": [
+        7.539017045655383,
+        0.41816796508141757,
+        7.729295679704395
+      ],
+      "pred_camera_xyz": [
+        7.534096319600071,
+        0.4150727887141925,
+        7.772077897718832
+      ],
+      "residual_mm": [
+        -4.92072605531213,
+        -3.095176367225061,
+        42.78221801443749
+      ],
+      "residual_norm_mm": 43.17536149113885
+    }
+  ],
+  "fit_stats_mm": {
+    "mean": 39.18462707002008,
+    "median": 39.09213069271833,
+    "rmse": 39.558276353540066,
+    "p95": 45.38061623322777,
+    "max": 45.76977883477287
+  },
+  "loo_errors_mm": [
+    7.872091697833945,
+    2.2218521347930538,
+    4.615428333830412,
+    6.6084986687299
+  ],
+  "loo_stats_mm": {
+    "mean": 5.329467708796828,
+    "median": 5.611963501280156,
+    "rmse": 5.74197021864708,
+    "p95": 7.682552743468338,
+    "max": 7.872091697833945
+  },
+  "geometry": {
+    "pairwise_distances_m": [
+      0.5035891188490139,
+      0.6388445761044932,
+      0.3928518711115121,
+      0.40166828879301186,
+      0.6372312744482397,
+      0.4950406990799154
+    ],
+    "centroid_spread_m": 0.31903402941334463,
+    "singular_values_m": [
+      0.4993163769956492,
+      0.397258106725084,
+      4.103828794820158e-16
+    ],
+    "condition_indicator": 1.256906702576602,
+    "rank": 2,
+    "warnings": []
+  },
+  "independent_R": [
+    [
+      -0.7182579549598871,
+      -0.6924664107883695,
+      0.06779218293220256
+    ],
+    [
+      -0.026294657194371834,
+      -0.07034908481736998,
+      -0.9971758106113431
+    ],
+    [
+      0.6952798725260714,
+      -0.7180120306758316,
+      0.03232062290392644
+    ]
+  ],
+  "independent_t": [
+    0.0660528809246621,
+    -1.289118209860162,
+    -0.8709614933283198
+  ],
+  "delta_rotation_vs_global_deg": 4.524298409568342,
+  "delta_translation_vs_global_mm": 909.4540726854786,
+  "camera_physical_ids": [
+    "BOARD_TOP_LEFT",
+    "BOARD_TOP_RIGHT",
+    "BOARD_BOTTOM_RIGHT",
+    "BOARD_BOTTOM_LEFT"
+  ],
+  "camera_marker_ids": [
+    1,
+    2,
+    4,
+    3
+  ],
+  "camera_board_xy": [
+    [
+      -0.25,
+      0.2
+    ],
+    [
+      0.25,
+      0.2
+    ],
+    [
+      0.25,
+      -0.2
+    ],
+    [
+      -0.25,
+      -0.2
+    ]
+  ],
+  "physical_id_note": "Camera physical IDs come from ArUco board marker convention and are stored separately from ordered_i. Current production solve still uses sorted/rolled ordered_i correspondences.",
+  "status": "SUSPICIOUS",
+  "warnings": []
+}

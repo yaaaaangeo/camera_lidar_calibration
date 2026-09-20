@@ -1,0 +1,77 @@
+{
+  "board_like": false,
+  "detector": {
+    "boundary_point_count": 139,
+    "circle_candidate_count": 7,
+    "circle_count": 7,
+    "ok": false,
+    "plane_point_count": 467,
+    "plane_rms": 0.005702841526258211,
+    "radii_m": [
+      0.14785754073764415,
+      0.09251770488684821,
+      0.14849243928401204,
+      0.12570779251270028,
+      0.14712988198034538,
+      0.13171707399483126,
+      0.14832902993823469
+    ],
+    "reason": "\uc6d0 7\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+  },
+  "hard_reject_reason": "",
+  "index": 2,
+  "plane_equation": {
+    "d": -17.127485959101694,
+    "normal": [
+      0.9954740334503595,
+      0.08012074236523936,
+      -0.0511088580278988
+    ]
+  },
+  "plane_point_count": 476,
+  "remaining_point_count": 1465,
+  "scores": {
+    "area_m2": 9.238213984946343,
+    "aspect_ratio": 1.629537310464683,
+    "aspect_similarity": 0.7095572421537748,
+    "boundary_count": 139,
+    "boundary_ratio": 0.2920168067226891,
+    "boundary_support": 1.0,
+    "centroid": [
+      17.915339946746826,
+      -9.288457744261798,
+      -0.7293842105740806
+    ],
+    "circle_candidate_count": 7,
+    "circle_count": 7,
+    "circle_support": 1.0,
+    "density_points_per_m2": 51.525110890009834,
+    "height_m": 2.381013481707628,
+    "normal": [
+      0.9954740334503595,
+      0.08012074236523936,
+      -0.0511088580278988
+    ],
+    "plane_d": -17.127485959101694,
+    "plane_quality": 0.963227119432286,
+    "plane_rms_m": 0.005806844611357257,
+    "point_count": 476,
+    "point_density": 0.1862486639033325,
+    "point_ratio": 0.20160948750529437,
+    "radii_m": [
+      0.14785754073764415,
+      0.09251770488684821,
+      0.14849243928401204,
+      0.12570779251270028,
+      0.14712988198034538,
+      0.13171707399483126,
+      0.14832902993823469
+    ],
+    "rectangularity": 0.6658252856620639,
+    "size_similarity": 0.19072409226878045,
+    "total_score": 0.6189359805731328,
+    "width_m": 3.879950305161999
+  },
+  "total_roi_points": 2361,
+  "total_score": 0.6189359805731328
+}

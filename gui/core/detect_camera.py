@@ -25,6 +25,12 @@ DICTIONARY = aruco.DICT_6X6_250
 # Quadrant -> ArUco id, matching qr_detect.hpp's boardIds{1, 2, 4, 3}.
 # Clockwise from top-left the ids read 1, 2, 4, 3 -- not 1, 2, 3, 4.
 MARKERS = [(-1, +1, 1), (+1, +1, 2), (+1, -1, 4), (-1, -1, 3)]
+CIRCLE_PHYSICAL_IDS = [
+    "BOARD_TOP_LEFT",
+    "BOARD_TOP_RIGHT",
+    "BOARD_BOTTOM_RIGHT",
+    "BOARD_BOTTOM_LEFT",
+]
 
 # Corner order within a marker, matching what detectMarkers returns:
 # top-left, top-right, bottom-right, bottom-left (board frame has +y up).
@@ -45,19 +51,47 @@ def board_model(t: Target) -> tuple[dict[int, np.ndarray], np.ndarray]:
     return corners, np.array(centers, dtype=np.float64)
 
 
+def board_circle_metadata(t: Target) -> list[dict]:
+    """Physical circle order carried by the camera side.
+
+    The camera observes ArUco IDs, so this order is a physical board convention,
+    not a geometric/PCA ordering.  Step 6 must keep it distinct from
+    `ordered_0..3`, which are solver ordering labels.
+    """
+    rows = []
+    for physical_id, (sx, sy, marker_id) in zip(CIRCLE_PHYSICAL_IDS, MARKERS):
+        rows.append({
+            "physical_id": physical_id,
+            "marker_id": marker_id,
+            "board_xy": [
+                sx * t.delta_width_circles / 2,
+                sy * t.delta_height_circles / 2,
+            ],
+        })
+    return rows
+
+
 @dataclass
 class CameraDetection:
     ok: bool
     ids: list[int] = field(default_factory=list)
     image_corners: np.ndarray | None = None  # (N, 4, 2)
     centers: np.ndarray | None = None  # (4, 3) circle centres, camera frame
+    center_ids: list[str] = field(default_factory=list)
+    center_marker_ids: list[int] = field(default_factory=list)
+    center_board_xy: list[list[float]] = field(default_factory=list)
     rvec: np.ndarray | None = None
     tvec: np.ndarray | None = None
     reproj_rms: float = 0.0
+    reproj_mean: float = 0.0
+    reproj_median: float = 0.0
+    reproj_p95: float = 0.0
     reproj_max: float = 0.0
     marker_px: float = 0.0  # mean marker side length in pixels
     distance: float = 0.0  # metres to board centre
     tilt_deg: float = 0.0  # angle between board normal and the viewing ray
+    bbox: tuple[float, float, float, float] | None = None
+    bbox_area_ratio: float = 0.0
     reason: str = ""
 
     @property
@@ -115,9 +149,15 @@ def detect(image: np.ndarray, camera: Camera, target: Target, min_markers: int =
 
     proj, _ = cv2.projectPoints(obj, rvec, tvec, camera.matrix(), camera.dist())
     err = np.linalg.norm(proj.reshape(-1, 2) - img, axis=1)
+    all_pts = img.reshape(-1, 2)
+    x0, y0 = np.min(all_pts, axis=0)
+    x1, y1 = np.max(all_pts, axis=0)
+    h, w = image.shape[:2]
+    bbox_area_ratio = float(max(0.0, x1 - x0) * max(0.0, y1 - y0) / max(1, w * h))
 
     R, _ = cv2.Rodrigues(rvec)
     centers = (R @ circle_model.T).T + tvec.ravel()
+    circle_meta = board_circle_metadata(target)
 
     normal = R @ np.array([0.0, 0.0, 1.0])
     view = tvec.ravel() / np.linalg.norm(tvec)
@@ -128,13 +168,21 @@ def detect(image: np.ndarray, camera: Camera, target: Target, min_markers: int =
         ids=[i for i, _ in known],
         image_corners=np.array([c for _, c in known]),
         centers=centers,
+        center_ids=[m["physical_id"] for m in circle_meta],
+        center_marker_ids=[m["marker_id"] for m in circle_meta],
+        center_board_xy=[m["board_xy"] for m in circle_meta],
         rvec=rvec,
         tvec=tvec,
         reproj_rms=float(np.sqrt((err**2).mean())),
+        reproj_mean=float(np.mean(err)),
+        reproj_median=float(np.median(err)),
+        reproj_p95=float(np.percentile(err, 95)),
         reproj_max=float(err.max()),
         marker_px=marker_px,
         distance=float(np.linalg.norm(tvec)),
         tilt_deg=tilt,
+        bbox=(float(x0), float(y0), float(x1), float(y1)),
+        bbox_area_ratio=bbox_area_ratio,
     )
 
 

@@ -1,0 +1,324 @@
+{
+  "decision": {
+    "status": "CALIBRATION_AMBIGUOUS",
+    "selection_source": "AMBIGUOUS",
+    "preferred_candidate_name": null,
+    "selected_candidate": null,
+    "confidence": "LOW",
+    "reason": "no physical LiDAR IDs and no decisive projection/seed prior; RMSE/LOO are auxiliary only",
+    "candidate_names": [
+      "NORMAL",
+      "HALF_TURN"
+    ],
+    "thresholds": {
+      "max_translation_from_seed_m": 1.0,
+      "max_rotation_from_seed_deg": 10.0,
+      "max_translation_norm_m": 10.0,
+      "seed_gate_enabled": true,
+      "min_match_rate": 0.05,
+      "min_projection_margin_px": 2.0,
+      "min_projection_p95_margin_px": 3.0,
+      "min_match_rate_ratio": 0.75,
+      "max_cross_scene_rotation_p95_deg": 10.0,
+      "max_cross_scene_translation_p95_mm": 500.0
+    }
+  },
+  "candidates": [
+    {
+      "name": "NORMAL",
+      "permutation": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "mapping": [
+        "lidar_ordered_0->camera_ordered_0",
+        "lidar_ordered_1->camera_ordered_1",
+        "lidar_ordered_2->camera_ordered_2",
+        "lidar_ordered_3->camera_ordered_3"
+      ],
+      "R": [
+        [
+          -0.6810739178681148,
+          -0.7319274329888992,
+          0.020507345953495872
+        ],
+        [
+          -0.046047780818257195,
+          0.014862972888445933,
+          -0.9988286609417202
+        ],
+        [
+          0.7307652976718924,
+          -0.6812204671581716,
+          -0.04382641718544288
+        ]
+      ],
+      "t": [
+        -0.5762251320307366,
+        -0.24452989919014448,
+        -0.6803290506826212
+      ],
+      "det_R": 0.9999999999999989,
+      "orthogonality_error_fro": 2.123438610762608e-15,
+      "fit_stats_mm": {
+        "mean": 5.765855049032779,
+        "median": 5.8124075812995475,
+        "rmse": 5.893450711064514,
+        "p95": 7.210947185567695,
+        "max": 7.440045378271951
+      },
+      "residual_norms_mm": [
+        5.912724093576917,
+        7.440045378271951,
+        5.712091069022179,
+        3.998559655260071
+      ],
+      "loo_errors_mm": [
+        8.04982591350579,
+        14.800234037257729,
+        8.63208465204476,
+        7.521475168701544
+      ],
+      "loo_stats_mm": {
+        "mean": 9.750904942877456,
+        "median": 8.340955282775276,
+        "rmse": 10.184941076766377,
+        "p95": 13.875011629475782,
+        "max": 14.800234037257729
+      },
+      "delta_rotation_seed_deg": null,
+      "delta_translation_seed_xyz_mm": null,
+      "delta_translation_seed_norm_mm": null,
+      "plausibility_warnings": [],
+      "projection_frame407": null,
+      "projection_summary": null,
+      "cross_scene_summary": null,
+      "status": "AMBIGUOUS"
+    },
+    {
+      "name": "REVERSED",
+      "permutation": [
+        3,
+        2,
+        1,
+        0
+      ],
+      "mapping": [
+        "lidar_ordered_0->camera_ordered_3",
+        "lidar_ordered_1->camera_ordered_2",
+        "lidar_ordered_2->camera_ordered_1",
+        "lidar_ordered_3->camera_ordered_0"
+      ],
+      "R": [
+        [
+          -0.831419936414251,
+          -0.5534873269526074,
+          0.04891490811379028
+        ],
+        [
+          0.06046361946709225,
+          -0.0026114640815276626,
+          0.998166985517098
+        ],
+        [
+          -0.5523450371406102,
+          0.83285350401989,
+          0.03563707041733307
+        ]
+      ],
+      "t": [
+        2.134826767786418,
+        0.3226645028421387,
+        22.255814759141323
+      ],
+      "det_R": 1.0000000000000013,
+      "orthogonality_error_fro": 1.7863743039932793e-15,
+      "fit_stats_mm": {
+        "mean": 5.765855049032871,
+        "median": 5.812407581299789,
+        "rmse": 5.893450711064591,
+        "p95": 7.210947185567591,
+        "max": 7.440045378271806
+      },
+      "residual_norms_mm": [
+        5.912724093577036,
+        7.440045378271806,
+        5.7120910690225415,
+        3.998559655260102
+      ],
+      "loo_errors_mm": [
+        8.049825913504554,
+        14.800234037257116,
+        8.632084652045052,
+        7.521475168702038
+      ],
+      "loo_stats_mm": {
+        "mean": 9.75090494287719,
+        "median": 8.340955282774804,
+        "rmse": 10.184941076766062,
+        "p95": 13.875011629475305,
+        "max": 14.800234037257116
+      },
+      "delta_rotation_seed_deg": null,
+      "delta_translation_seed_xyz_mm": null,
+      "delta_translation_seed_norm_mm": null,
+      "plausibility_warnings": [
+        "TRANSLATION_NORM_IMPLAUSIBLE"
+      ],
+      "projection_frame407": null,
+      "projection_summary": null,
+      "cross_scene_summary": null,
+      "status": "PHYSICALLY_IMPLAUSIBLE"
+    },
+    {
+      "name": "MIRROR",
+      "permutation": [
+        1,
+        0,
+        3,
+        2
+      ],
+      "mapping": [
+        "lidar_ordered_0->camera_ordered_1",
+        "lidar_ordered_1->camera_ordered_0",
+        "lidar_ordered_2->camera_ordered_3",
+        "lidar_ordered_3->camera_ordered_2"
+      ],
+      "R": [
+        [
+          0.6802118033735981,
+          0.7315313749043454,
+          -0.04662349280990913
+        ],
+        [
+          -0.019894906390178446,
+          -0.04515724882536607,
+          -0.9987817657417717
+        ],
+        [
+          -0.7327455869883925,
+          0.6803107160769133,
+          -0.016162745433691655
+        ]
+      ],
+      "t": [
+        6.3244728700831425,
+        -1.0074654381244226,
+        21.72085620271627
+      ],
+      "det_R": 1.000000000000001,
+      "orthogonality_error_fro": 1.6634068785638353e-15,
+      "fit_stats_mm": {
+        "mean": 5.765855049032904,
+        "median": 5.812407581299964,
+        "rmse": 5.893450711064637,
+        "p95": 7.210947185567624,
+        "max": 7.440045378271774
+      },
+      "residual_norms_mm": [
+        5.912724093577444,
+        7.440045378271774,
+        5.712091069022484,
+        3.9985596552599136
+      ],
+      "loo_errors_mm": [
+        8.049825913504646,
+        14.800234037258296,
+        8.632084652044739,
+        7.521475168700536
+      ],
+      "loo_stats_mm": {
+        "mean": 9.750904942877053,
+        "median": 8.340955282774694,
+        "rmse": 10.184941076766165,
+        "p95": 13.87501162947626,
+        "max": 14.800234037258296
+      },
+      "delta_rotation_seed_deg": null,
+      "delta_translation_seed_xyz_mm": null,
+      "delta_translation_seed_norm_mm": null,
+      "plausibility_warnings": [
+        "TRANSLATION_NORM_IMPLAUSIBLE"
+      ],
+      "projection_frame407": null,
+      "projection_summary": null,
+      "cross_scene_summary": null,
+      "status": "PHYSICALLY_IMPLAUSIBLE"
+    },
+    {
+      "name": "HALF_TURN",
+      "permutation": [
+        2,
+        3,
+        0,
+        1
+      ],
+      "mapping": [
+        "lidar_ordered_0->camera_ordered_2",
+        "lidar_ordered_1->camera_ordered_3",
+        "lidar_ordered_2->camera_ordered_0",
+        "lidar_ordered_3->camera_ordered_1"
+      ],
+      "R": [
+        [
+          0.8322820509087675,
+          0.5538833850371612,
+          -0.02279876125737708
+        ],
+        [
+          0.005479067741343534,
+          0.03290574001844771,
+          0.9994434411663939
+        ],
+        [
+          0.5543253264571094,
+          -0.831943752938631,
+          0.02435209220180137
+        ]
+      ],
+      "t": [
+        3.6471520663249763,
+        1.0054140720233744,
+        -1.1378067973262986
+      ],
+      "det_R": 0.9999999999999991,
+      "orthogonality_error_fro": 1.2677602206871922e-15,
+      "fit_stats_mm": {
+        "mean": 5.7658550490330915,
+        "median": 5.812407581299922,
+        "rmse": 5.89345071106478,
+        "p95": 7.210947185567745,
+        "max": 7.440045378271932
+      },
+      "residual_norms_mm": [
+        5.91272409357736,
+        7.440045378271932,
+        5.712091069022484,
+        3.99855965526059
+      ],
+      "loo_errors_mm": [
+        8.049825913504977,
+        14.80023403725777,
+        8.632084652044927,
+        7.521475168701252
+      ],
+      "loo_stats_mm": {
+        "mean": 9.750904942877233,
+        "median": 8.340955282774953,
+        "rmse": 10.184941076766213,
+        "p95": 13.875011629475841,
+        "max": 14.80023403725777
+      },
+      "delta_rotation_seed_deg": null,
+      "delta_translation_seed_xyz_mm": null,
+      "delta_translation_seed_norm_mm": null,
+      "plausibility_warnings": [],
+      "projection_frame407": null,
+      "projection_summary": null,
+      "cross_scene_summary": null,
+      "status": "AMBIGUOUS"
+    }
+  ]
+}

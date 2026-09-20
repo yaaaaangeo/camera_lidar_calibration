@@ -1,0 +1,6 @@
+{
+  "audit_status": "PREPROCESSING_INVALIDATED",
+  "usable_for_candidate_selection": false,
+  "reason": "raw cloud linear subsampling occurred before LiDAR depth-edge extraction",
+  "replacement": "calib_result/scene407_projection_evidence_corrected"
+}

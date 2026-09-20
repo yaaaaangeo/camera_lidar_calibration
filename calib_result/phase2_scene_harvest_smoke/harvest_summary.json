@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "production_solve_changed": false,
+    "yaml_or_extrinsic_written": false,
+    "temporal_correction_applied": false,
+    "deskew_applied": false,
+    "seed_extrinsic_is_diagnostic_only": true,
+    "pairing": "LiDAR board median timestamp -> nearest camera header for final correspondence",
+    "duplicate_thresholds": {
+      "min_time_separation_s": 0.5,
+      "min_translation_separation_m": 0.1,
+      "min_rotation_separation_deg": 5.0
+    }
+  },
+  "total_frames": 30,
+  "raw_valid_scenes": 0,
+  "after_duplicate_removal": 0,
+  "detection_funnel": {
+    "TOTAL_LIDAR_FRAMES": 30,
+    "CAMERA_PAIR_FOUND": 30,
+    "CAMERA_DETECTION_VALID": 30,
+    "CAMERA_PNP_VALID": 30,
+    "CAMERA_PNP_QUALITY_PASS": 30,
+    "LIDAR_ROI_VALID": 4,
+    "LIDAR_PLANE_VALID": 4,
+    "LIDAR_BOUNDARY_VALID": 4,
+    "LIDAR_CIRCLE_GE_1": 1,
+    "LIDAR_CIRCLE_GE_2": 0,
+    "LIDAR_CIRCLE_GE_3": 0,
+    "LIDAR_CIRCLE_GE_4": 0,
+    "LIDAR_GEOMETRY_PASS": 0,
+    "LIDAR_FULL_TARGET_VALID": 0,
+    "TIMESTAMP_VALID": 0,
+    "FOUR_CORRESPONDENCES_CREATED": 0,
+    "FINAL_VALID_SCENES": 0
+  },
+  "failure_reasons": {
+    "LIDAR_ROI_INVALID": 26,
+    "CIRCLE_LT_4": 4
+  },
+  "motion_distribution": {
+    "groups": {
+      "LOW": 0,
+      "MID": 0,
+      "HIGH": 0,
+      "UNKNOWN": 0
+    },
+    "translation_velocity_mm_s": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "rotation_velocity_deg_s": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    }
+  },
+  "pose_diversity": {
+    "distance_m": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "horizontal_x_m": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "vertical_y_m": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "yaw_deg": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "pitch_deg": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "roll_deg": {
+      "p10": NaN,
+      "p25": NaN,
+      "median": NaN,
+      "p75": NaN,
+      "p90": NaN,
+      "p95": NaN,
+      "min": NaN,
+      "max": NaN
+    },
+    "translation_range_m": NaN,
+    "yaw_range_deg": NaN,
+    "pitch_range_deg": NaN,
+    "roll_range_deg": NaN
+  },
+  "temporal_readiness": "INSUFFICIENT",
+  "readiness_reason": "0 independent valid scenes after duplicate removal; need at least 5, preferably 10+.",
+  "scene407_detected": false
+}

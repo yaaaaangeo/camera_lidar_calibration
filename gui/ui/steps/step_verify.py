@@ -15,26 +15,73 @@ from __future__ import annotations
 
 import html
 import threading
+from dataclasses import dataclass
 
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from gui.core import verify
+from gui.core import bag_reader, roi_auto, verify
 from gui.core.bag_reader import BagSource, accumulate_cloud, pick_camera_for_frame
-from gui.core.decode import image_to_bgr
+from gui.core.decode import cloud_to_struct, image_to_bgr
 from gui.core.detect_camera import detect as detect_camera
 from gui.core.detect_lidar import DetectParams, apply_box, detect as detect_lidar, point_spacing
 from pathlib import Path
 
+from gui.core.evaluation import ab_export as abx
+from gui.core.evaluation import board_motion as bm
+from gui.core.evaluation import board_timestamp as bt
 from gui.core.evaluation import diagnostics as dg
 from gui.core.evaluation import edge_alignment as ea
+from gui.core.evaluation import holdout as ho
 from gui.core.evaluation import multiframe_consistency as mc
 from gui.core.evaluation import perturbation as pert
 from gui.core.evaluation import spatial_analysis as sa
+from gui.core.evaluation import timestamp_diagnostic as td
 from gui.core.project import RESULT_DIR, Project
 from gui.core.solve import Solution, solve_rigid, sort_centers, to_fast_livo2
 from gui.ui.steps import StepPage
 from gui.ui.steps.step_filter import derive_params
+
+
+@dataclass
+class _HoldoutRequest:
+    """Everything one Hold-out run needs, bundled into a single object so the
+    Qt signal carrying it to the worker thread does not have to grow another
+    positional parameter every time this feature gains one more piece of
+    provenance -- see gui.core.evaluation.holdout's module docstring for what
+    most of these fields mean. Built once, in `VerifyStep._run_holdout`, at
+    the exact moment "Hold-out 평가 실행" is pressed: this *is* the candidate
+    lock -- nothing downstream re-reads the UI's combo boxes.
+    """
+
+    gen: int
+    bag: str
+    lidar_topic: str
+    camera_topic: str
+    camera: object
+    baseline_R: np.ndarray
+    baseline_t: np.ndarray
+    axis: str
+    delta: float
+    source_label: str
+    times: list          # usable (already margin-filtered) timestamps to actually load
+    min_range: float
+    max_range: float
+    max_sync_offset_ms: float
+    discovery_bag: str
+    discovery_timestamps: tuple
+    exclusion_margin_s: float
+    requested_timestamps: tuple    # sampled before exclusion
+    excluded_near_discovery: tuple
+    bootstrap_iterations: int
+    bootstrap_block_s: float
+    # The value of VerifyStep._discovery_revision (project-persistent, see
+    # gui.core.evaluation.holdout.CandidateProvenance's docstring) at the
+    # moment this candidate was locked -- folded into holdout.CandidateProvenance
+    # so exposure tracking can tell "the same candidate" from "read off a
+    # Discovery result superseded since this dataset was first shown", even
+    # across an app restart -- see gui.core.evaluation.holdout.classify_exposure.
+    discovery_revision: int
 
 
 class _Worker(QtCore.QObject):
@@ -67,12 +114,39 @@ class _Worker(QtCore.QObject):
     fine_ready = QtCore.Signal(int, object)       # gen, AxisSensitivity
     fine_failed = QtCore.Signal(int, str)
 
+    # Independent Hold-out Validation -- a second bag (or a disjoint time
+    # range of the current one), opened purely to check whether a candidate
+    # already locked from Perturbation/Fine Scan still looks better than
+    # baseline on data that candidate was never searched against. See
+    # gui.core.evaluation.holdout's module docstring: no fitting, no search,
+    # ever happens against hold-out data.
+    holdout_bag_progress = QtCore.Signal(int, int, int)  # gen, done, total
+    holdout_bag_ready = QtCore.Signal(int, object)       # gen, sorted lidar timestamps
+    holdout_bag_failed = QtCore.Signal(int, str)
+    holdout_progress = QtCore.Signal(int, str, int, int)  # gen, phase ("prepare"|"evaluate"), done, total
+    holdout_ready = QtCore.Signal(int, object)            # gen, holdout.HoldoutResult
+    holdout_failed = QtCore.Signal(int, str)
+    board_motion_progress = QtCore.Signal(int, int, int)  # gen, done, total
+    board_motion_ready = QtCore.Signal(int, object)       # gen, BoardMotionResult
+    board_motion_failed = QtCore.Signal(int, str)
+    tsdiag_progress = QtCore.Signal(int, str, int, int)   # gen, phase, done, total
+    tsdiag_ready = QtCore.Signal(int, object)             # gen, list[TimestampDiagnosticMetrics]
+    tsdiag_failed = QtCore.Signal(int, str)
+    board_ts_progress = QtCore.Signal(int, int, int)      # gen, done, total
+    board_ts_ready = QtCore.Signal(int, object)           # gen, BoardTimestampResult
+    board_ts_failed = QtCore.Signal(int, str)
+
     def __init__(self):
         super().__init__()
         self._src: BagSource | None = None
+        self._holdout_src: BagSource | None = None  # kept separate so a hold-out bag never evicts the main view's cache
         self._mf_cancel = threading.Event()
         self._pert_cancel = threading.Event()
         self._fine_cancel = threading.Event()
+        self._holdout_cancel = threading.Event()
+        self._board_motion_cancel = threading.Event()
+        self._tsdiag_cancel = threading.Event()
+        self._board_ts_cancel = threading.Event()
 
     def _source(self, bag: str) -> BagSource:
         if self._src is None or str(self._src.path) != bag:
@@ -81,6 +155,26 @@ class _Worker(QtCore.QObject):
             self._src = BagSource(bag)
             self._src.open()
         return self._src
+
+    def _holdout_source(self, bag: str) -> BagSource:
+        """The reader a hold-out run should read `bag` from.
+
+        The "Current Bag Time Range" hold-out mode reads the exact same file
+        the main view already has open (`_src`), so it is served from there
+        rather than opened a second time. "Separate Bag" reads a different
+        file, kept in its own `_holdout_src` so opening it never evicts the
+        main view's cached reader -- switching back to scrub the main
+        timeline would otherwise have to reopen a bag that never stopped
+        being relevant.
+        """
+        if self._src is not None and str(self._src.path) == bag:
+            return self._source(bag)
+        if self._holdout_src is None or str(self._holdout_src.path) != bag:
+            if self._holdout_src is not None:
+                self._holdout_src.close()
+            self._holdout_src = BagSource(bag)
+            self._holdout_src.open()
+        return self._holdout_src
 
     def open_bag(self, gen: int, bag: str, lidar_topic: str):
         """Read the LiDAR message times so the timeline has something to span.
@@ -187,6 +281,473 @@ class _Worker(QtCore.QObject):
 
     def cancel_multiframe(self):
         self._mf_cancel.set()
+
+    def cancel_board_motion(self):
+        self._board_motion_cancel.set()
+
+    def cancel_timestamp_diagnostic(self):
+        self._tsdiag_cancel.set()
+
+    def cancel_board_timestamp_diagnostic(self):
+        self._board_ts_cancel.set()
+
+    def run_timestamp_diagnostic(self, gen: int, bag: str, lidar_topic: str, camera_topic: str,
+                                 camera, sol, times: list[int], n_samples: int,
+                                 min_range: float, max_range: float,
+                                 stable_only: bool, stable_times: list[int]):
+        """Compare timestamp pairing modes without changing the normal pairing path."""
+        from gui.core import verify
+        from gui.core.evaluation.edge_alignment import aggregate_point_stats
+
+        self._tsdiag_cancel.clear()
+        try:
+            src = self._source(bag)
+            source_times = list(stable_times) if stable_only and stable_times else list(times)
+            indices = mc.sample_frame_indices(len(source_times), n_samples)
+            if not indices:
+                self.tsdiag_failed.emit(gen, "No frames available for timestamp diagnostic.")
+                return
+
+            camera_record_times = src.timestamps(camera_topic)
+            camera_entries = []
+            for rec_ns, msg in src.range(camera_topic, camera_record_times[0], camera_record_times[-1] + 1):
+                h_ns = td.header_stamp_ns(msg)
+                if h_ns is None:
+                    continue
+                camera_entries.append((td.CameraStamp(record_ns=rec_ns, header_ns=h_ns), msg))
+            if not camera_entries:
+                self.tsdiag_failed.emit(gen, "Camera messages have no usable header.stamp.")
+                return
+            camera_stamps = [c[0] for c in camera_entries]
+
+            lidar_stamps, lidar_payloads = [], []
+            total = len(indices)
+            base_t = source_times[0]
+            for done, idx in enumerate(indices, start=1):
+                if self._tsdiag_cancel.is_set():
+                    break
+                record_ns = source_times[idx]
+                got_ns, msg = src.nearest(lidar_topic, record_ns, window_ns=1_000_000)
+                if msg is None:
+                    self.tsdiag_progress.emit(gen, "load", done, total)
+                    continue
+                rec = cloud_to_struct(msg)
+                xyz = np.column_stack([rec["x"], rec["y"], rec["z"]]).astype(np.float32)
+                finite = np.isfinite(xyz).all(axis=1)
+                xyz = xyz[finite]
+                point_ts = np.asarray(rec["timestamp"])[finite] if "timestamp" in (rec.dtype.names or ()) else None
+                stamp = td.make_lidar_stamp(got_ns, msg, point_ts)
+                lidar_stamps.append(stamp)
+                lidar_payloads.append((idx, got_ns, (got_ns - base_t) / 1e9, xyz))
+                self.tsdiag_progress.emit(gen, "load", done, total)
+
+            if len(lidar_stamps) < 2:
+                self.tsdiag_failed.emit(gen, "Need at least two LiDAR frames with usable timestamps.")
+                return
+
+            results = []
+            modes = [
+                td.PairingMode.RECORD_TO_RECORD,
+                td.PairingMode.HEADER_TO_SWEEP_START,
+                td.PairingMode.HEADER_TO_SWEEP_MID,
+                td.PairingMode.HEADER_TO_SWEEP_END,
+            ]
+            for mode_i, mode in enumerate(modes, start=1):
+                if self._tsdiag_cancel.is_set():
+                    break
+                pairs, pair_summary = td.pair_by_mode(
+                    camera_stamps, lidar_stamps, mode, list(range(len(lidar_stamps)))
+                )
+                frame_results = []
+                edge_results = []
+                frames = []
+                for done, (li, ci, lid_ref, cam_ref) in enumerate(pairs, start=1):
+                    if self._tsdiag_cancel.is_set():
+                        break
+                    timeline_idx, lidar_record_ns, offset_s, cloud = lidar_payloads[li]
+                    image = image_to_bgr(camera_entries[ci][1])
+                    h, w = image.shape[:2]
+                    pr = verify.project_cloud(cloud, sol, camera, w, h, min_range=min_range, max_range=max_range)
+                    frames.append(td.TimestampDiagnosticFrame(
+                        timeline_index=timeline_idx,
+                        lidar_record_ns=lidar_record_ns,
+                        lidar_reference_ns=lid_ref,
+                        camera_record_ns=camera_entries[ci][0].record_ns,
+                        camera_reference_ns=cam_ref,
+                        signed_sync_offset_ms=(cam_ref - lid_ref) / 1e6,
+                    ))
+                    if pr.n_visible:
+                        er = ea.evaluate_edge_alignment(image, pr.uv, pr.depth, ea.EdgeAlignmentParams())
+                        if er.ok:
+                            edge_results.append((er, w, h))
+                    self.tsdiag_progress.emit(gen, td.PAIRING_LABELS[mode], done, len(pairs))
+
+                metrics = self._timestamp_metrics_from_edges(mode, pair_summary, frames, edge_results, aggregate_point_stats)
+                results.append(metrics)
+                self.tsdiag_progress.emit(gen, "mode", mode_i, len(modes))
+            self.tsdiag_ready.emit(gen, results)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.tsdiag_failed.emit(gen, f"{type(exc).__name__}: {exc}")
+
+    def run_board_timestamp_diagnostic(self, gen: int, bag: str, lidar_topic: str, camera_topic: str,
+                                       camera, target, sol, times: list[int], scenes: list,
+                                       n_samples: int, stable_times: list[int], method: str):
+        """Board-specific LiDAR timestamp diagnostic.
+
+        Uses existing camera board detection, existing ROI/auto-ROI placement,
+        and the existing LiDAR board detector. The board point set is the
+        detector's board-plane inlier set (`LidarDetection.plane_indices`).
+        """
+        self._board_ts_cancel.clear()
+        try:
+            src = self._source(bag)
+            indices = mc.sample_frame_indices(len(times), n_samples)
+            if not indices:
+                self.board_ts_failed.emit(gen, "No frames available.")
+                return
+
+            camera_record_times = src.timestamps(camera_topic)
+            camera_record_index = {int(t): i for i, t in enumerate(camera_record_times)}
+            camera_headers = []
+            if camera_record_times:
+                for rec_ns, msg in src.range(camera_topic, camera_record_times[0], camera_record_times[-1] + 1):
+                    h_ns = td.header_stamp_ns(msg)
+                    if h_ns is None:
+                        continue
+                    camera_headers.append((camera_record_index.get(int(rec_ns), -1), int(rec_ns), int(h_ns)))
+            stable_set = set(int(t) for t in stable_times or [])
+            scene_rois = [(s.t_ns, s.roi()) for s in scenes if getattr(s, "roi_set", False)]
+            frames = []
+            failed = 0
+            processed = 0
+            plane_success = 0
+            enough_plane_points = 0
+            circle_candidates = 0
+            four_or_more_circles = 0
+            geometry_passed = 0
+            full_target_success = 0
+            board_timestamp_valid = 0
+            board_pose_valid = 0
+            lidar_failure_reasons: dict[str, int] = {}
+            for done, idx in enumerate(indices, start=1):
+                if self._board_ts_cancel.is_set():
+                    break
+                processed += 1
+                lidar_record_ns = times[idx]
+                got_ns, lidar_msg = src.nearest(lidar_topic, lidar_record_ns, window_ns=1_000_000)
+                cam_record_ns, cam_msg = src.nearest(camera_topic, lidar_record_ns, window_ns=200_000_000)
+                if lidar_msg is None or cam_msg is None:
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+
+                rec = cloud_to_struct(lidar_msg)
+                xyz = np.column_stack([rec["x"], rec["y"], rec["z"]]).astype(np.float32)
+                finite = np.isfinite(xyz).all(axis=1)
+                xyz = xyz[finite]
+                if "timestamp" not in (rec.dtype.names or ()):
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+                point_ts = np.asarray(rec["timestamp"])[finite]
+                valid_ts = point_ts[np.isfinite(point_ts)]
+                if valid_ts.size == 0:
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+                sweep_start_ns = int(float(np.min(valid_ts)) * 1e9)
+                sweep_end_ns = int(float(np.max(valid_ts)) * 1e9)
+
+                image = image_to_bgr(cam_msg)
+                cam_det = detect_camera(image, camera, target)
+                if not cam_det.ok:
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+
+                roi = self._nearest_scene_roi(scene_rois, lidar_record_ns)
+                if roi is None:
+                    roi = self._board_timestamp_auto_roi(xyz, sol, cam_det, target, idx)
+                    if roi is None:
+                        failed += 1
+                        self.board_ts_progress.emit(gen, done, len(indices))
+                        continue
+
+                inside = apply_box(xyz, roi)
+                params = derive_params(point_spacing(inside) if len(inside) > 20 else 0.0)
+                params.method = method
+                ring = np.asarray(rec["ring"])[finite].astype(np.int32) if "ring" in (rec.dtype.names or ()) else None
+                det = detect_lidar(xyz, roi, target, params, ring=ring)
+                if det.plane_indices is None or len(det.plane_indices) == 0:
+                    key = det.reason or "no plane indices"
+                    lidar_failure_reasons[key] = lidar_failure_reasons.get(key, 0) + 1
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+                plane_success += 1
+                if len(det.plane) >= 50:
+                    enough_plane_points += 1
+                if det.n_clusters > 0:
+                    circle_candidates += 1
+                if det.n_circles >= 4:
+                    four_or_more_circles += 1
+                if det.ok:
+                    geometry_passed += 1
+                    full_target_success += 1
+                    board_pose_valid += 1
+                else:
+                    key = det.reason or "full target rejected"
+                    lidar_failure_reasons[key] = lidar_failure_reasons.get(key, 0) + 1
+
+                board_ts = point_ts[np.asarray(det.plane_indices, dtype=np.int64)]
+                board_ts = board_ts[np.isfinite(board_ts)]
+                if len(board_ts) == 0:
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+                board_timestamp_valid += 1
+                cam_header_ns = td.header_stamp_ns(cam_msg)
+                if cam_header_ns is None:
+                    failed += 1
+                    self.board_ts_progress.emit(gen, done, len(indices))
+                    continue
+                current_camera_index = camera_record_index.get(int(cam_record_ns), -1)
+                status = "STABLE" if int(got_ns) in stable_set else "ALL"
+                frames.append(bt.frame_from_timestamps(
+                    frame_index=idx,
+                    lidar_record_ns=got_ns,
+                    camera_header_ns=cam_header_ns,
+                    sweep_start_ns=sweep_start_ns,
+                    sweep_end_ns=sweep_end_ns,
+                    board_point_timestamps_s=board_ts,
+                    status=status,
+                    current_camera_index=current_camera_index,
+                    current_camera_record_ns=int(cam_record_ns),
+                    camera_headers=camera_headers,
+                    plane_detected=True,
+                    full_target_detected=bool(det.ok),
+                    board_pose_valid=bool(det.ok),
+                    lidar_plane_point_count=len(det.plane),
+                    lidar_circle_candidate_count=det.n_clusters,
+                    lidar_circle_count=det.n_circles,
+                    lidar_radii=list(det.radii),
+                    lidar_detection_reason=det.reason,
+                ))
+                self.board_ts_progress.emit(gen, done, len(indices))
+            self.board_ts_ready.emit(gen, bt.BoardTimestampResult(
+                frames=frames,
+                failed_frames=failed,
+                processed_frames=processed,
+                plane_detection_success=plane_success,
+                enough_plane_points_success=enough_plane_points,
+                circle_candidate_success=circle_candidates,
+                four_or_more_circles_success=four_or_more_circles,
+                geometry_validation_success=geometry_passed,
+                full_target_detection_success=full_target_success,
+                board_timestamp_valid_count=board_timestamp_valid,
+                board_pose_valid_count=board_pose_valid,
+                lidar_failure_reasons=lidar_failure_reasons,
+            ))
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.board_ts_failed.emit(gen, f"{type(exc).__name__}: {exc}")
+
+    @staticmethod
+    def _nearest_scene_roi(scene_rois: list, t_ns: int, max_dt_ns: int = 500_000_000):
+        if not scene_rois:
+            return None
+        t, roi = min(scene_rois, key=lambda item: abs(int(item[0]) - int(t_ns)))
+        return roi if abs(int(t) - int(t_ns)) <= max_dt_ns else None
+
+    @staticmethod
+    def _board_timestamp_auto_roi(xyz, sol, cam_det, target, idx: int):
+        for margin in (roi_auto.MARGIN_M, 1.5, 3.0, 5.0, 8.0):
+            placement = roi_auto.place(xyz, sol, cam_det, target, scene_id=str(idx), margin=margin)
+            if placement.ok and placement.box is not None:
+                return placement.box
+        return None
+
+    @staticmethod
+    def _timestamp_metrics_from_edges(mode, pair_summary, frames, edge_results, aggregate_point_stats):
+        if not edge_results:
+            return td.TimestampDiagnosticMetrics(
+                mode=mode, n_total=len(frames), n_failed=len(frames),
+                reason=pair_summary.warning or "No valid edge-alignment frames.",
+                sync_stats=pair_summary.sync_stats, frames=frames,
+            )
+        errors = np.concatenate([r.edge_errors_px for r, _, _ in edge_results if r.edge_errors_px is not None])
+        matched = np.concatenate([r.edge_matched for r, _, _ in edge_results if r.edge_matched is not None])
+        du = np.concatenate([r.edge_delta_u_px for r, _, _ in edge_results if r.edge_delta_u_px is not None])
+        dv = np.concatenate([r.edge_delta_v_px for r, _, _ in edge_results if r.edge_delta_v_px is not None])
+        agg = aggregate_point_stats(errors, matched, du, dv)
+        frame_matched_means = np.asarray([r.matched_mean_px for r, _, _ in edge_results], dtype=float)
+        frame_match_rates = np.asarray([r.match_rate for r, _, _ in edge_results], dtype=float)
+
+        # Build one synthetic EdgeAlignmentResult so existing spatial/depth
+        # grouping code can reduce all points in the same way as the rest of
+        # the evaluation UI.
+        pooled = ea.EdgeAlignmentResult(
+            ok=True,
+            edge_pixels=np.vstack([r.edge_pixels for r, _, _ in edge_results if r.edge_pixels is not None]),
+            edge_depths=np.concatenate([r.edge_depths for r, _, _ in edge_results if r.edge_depths is not None]),
+            edge_errors_px=errors,
+            edge_matched=matched,
+            edge_delta_u_px=du,
+            edge_delta_v_px=dv,
+        )
+        width, height = edge_results[-1][1], edge_results[-1][2]
+        spatial = sa.analyze_spatial(pooled, width, height)
+        horizontal = {}
+        depth = {}
+        if spatial is not None:
+            horizontal = {
+                label: {
+                    "matched_mean_px": b.matched_mean_px,
+                    "match_rate": b.match_rate,
+                    "median_delta_u_px": b.median_delta_u_px,
+                    "median_delta_v_px": b.median_delta_v_px,
+                }
+                for label, b in spatial.horizontal.items()
+            }
+            depth = {
+                label: {
+                    "matched_mean_px": b.matched_mean_px,
+                    "match_rate": b.match_rate,
+                    "median_delta_u_px": b.median_delta_u_px,
+                    "median_delta_v_px": b.median_delta_v_px,
+                }
+                for label, b in spatial.depth_bins.items()
+            }
+        return td.TimestampDiagnosticMetrics(
+            mode=mode,
+            n_total=len(frames),
+            n_valid=len(edge_results),
+            n_failed=max(0, len(frames) - len(edge_results)),
+            reason=pair_summary.warning,
+            mean_px=float(np.mean(errors)),
+            median_px=float(np.median(errors)),
+            p95_px=float(np.percentile(errors, 95)),
+            matched_mean_px=agg["matched_mean_px"],
+            matched_median_px=agg["matched_median_px"],
+            matched_p95_px=agg["matched_p95_px"],
+            matched_p99_px=agg["matched_p99_px"],
+            matched_max_px=agg["matched_max_px"],
+            match_rate_mean=float(np.nanmean(frame_match_rates)),
+            match_rate_median=float(np.nanmedian(frame_match_rates)),
+            matched_std_px=float(np.nanstd(frame_matched_means, ddof=1)) if np.isfinite(frame_matched_means).sum() > 1 else 0.0,
+            within_2px=agg["match_rate_by_threshold_px"].get(2.0, float("nan")),
+            within_3px=agg["match_rate_by_threshold_px"].get(3.0, float("nan")),
+            within_5px=agg["match_rate_by_threshold_px"].get(5.0, float("nan")),
+            within_10px=agg["match_rate_by_threshold_px"].get(10.0, float("nan")),
+            within_15px=agg["match_rate_by_threshold_px"].get(15.0, float("nan")),
+            median_delta_u_px=agg["median_delta_u_px"],
+            median_delta_v_px=agg["median_delta_v_px"],
+            sync_stats=pair_summary.sync_stats,
+            frames=frames,
+            horizontal=horizontal,
+            depth=depth,
+        )
+
+    def run_board_motion(self, gen: int, bag: str, camera_topic: str, camera, target,
+                         n_samples: int, translation_threshold_mm: float,
+                         rotation_threshold_deg: float):
+        """Detect the calibration board in camera frames and classify motion.
+
+        Camera timestamps are the bag message timestamps exposed by BagSource.
+        The camera detector uses ChArUco/Aruco-style marker PnP
+        (`gui.core.detect_camera.detect`), so this phase depends only on camera
+        board pose and does not change or re-fit the extrinsic.
+        """
+        import cv2
+
+        self._board_motion_cancel.clear()
+        try:
+            src = self._source(bag)
+            camera_times = src.timestamps(
+                camera_topic,
+                progress=lambda done, total: self.scanning.emit(gen, done, total),
+            )
+            indices = mc.sample_frame_indices(len(camera_times), n_samples)
+            total = len(indices)
+            samples = []
+            invalid = []
+            for done, idx in enumerate(indices, start=1):
+                if self._board_motion_cancel.is_set():
+                    break
+                stamp = camera_times[idx]
+                _, img_msg = src.nearest(camera_topic, stamp, window_ns=1_000_000)
+                if img_msg is not None:
+                    det = detect_camera(image_to_bgr(img_msg), camera, target)
+                    reason = self._camera_pose_invalid_reason(det)
+                    if reason is None and det.rvec is not None and det.tvec is not None:
+                        R, _ = cv2.Rodrigues(det.rvec)
+                        samples.append(
+                            bm.BoardPoseSample(
+                                timestamp_ns=stamp,
+                                frame_index=idx,
+                                R=R,
+                                t=np.asarray(det.tvec, dtype=float).reshape(3),
+                                quality=1.0 / max(det.reproj_rms, 1e-6),
+                                reproj_rms=det.reproj_rms,
+                                reproj_median=det.reproj_median,
+                                reproj_p95=det.reproj_p95,
+                                reproj_max=det.reproj_max,
+                            )
+                        )
+                    else:
+                        invalid.append(bm.BoardMotionFrame(
+                            timestamp_ns=stamp,
+                            frame_index=idx,
+                            status=bm.INVALID,
+                            valid_pose=False,
+                            invalid_reason=reason or "pose unavailable",
+                            reproj_rms=getattr(det, "reproj_rms", float("nan")),
+                            reproj_median=getattr(det, "reproj_median", float("nan")),
+                            reproj_p95=getattr(det, "reproj_p95", float("nan")),
+                            reproj_max=getattr(det, "reproj_max", float("nan")),
+                        ))
+                else:
+                    invalid.append(bm.BoardMotionFrame(
+                        timestamp_ns=stamp,
+                        frame_index=idx,
+                        status=bm.INVALID,
+                        valid_pose=False,
+                        invalid_reason="missing camera message",
+                    ))
+                self.board_motion_progress.emit(gen, done, total)
+            result = bm.analyze_board_motion(
+                samples,
+                translation_threshold_mm=translation_threshold_mm,
+                rotation_threshold_deg=rotation_threshold_deg,
+                attempted_count=total,
+                invalid_frames=invalid,
+            )
+            self.board_motion_ready.emit(gen, result)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.board_motion_failed.emit(gen, f"{type(exc).__name__}: {exc}")
+
+    @staticmethod
+    def _camera_pose_invalid_reason(det) -> str | None:
+        if det is None:
+            return "camera detector returned no result"
+        if not getattr(det, "ok", False):
+            return getattr(det, "reason", "board detection failed") or "board detection failed"
+        if getattr(det, "rvec", None) is None or getattr(det, "tvec", None) is None:
+            return "solvePnP pose unavailable"
+        tvec = np.asarray(det.tvec, dtype=float).reshape(-1)
+        rvec = np.asarray(det.rvec, dtype=float).reshape(-1)
+        if not np.isfinite(tvec).all() or not np.isfinite(rvec).all():
+            return "pose contains NaN/Inf"
+        distance = float(np.linalg.norm(tvec))
+        if not np.isfinite(distance) or distance < 0.2 or distance > 80.0:
+            return f"unrealistic board distance {distance:.2f} m"
+        if getattr(det, "n_markers", 0) < 3:
+            return f"too few board markers ({getattr(det, 'n_markers', 0)})"
+        if getattr(det, "reproj_rms", 0.0) > 5.0 or getattr(det, "reproj_p95", 0.0) > 8.0:
+            return (
+                f"high reprojection error rms={getattr(det, 'reproj_rms', float('nan')):.2f}px "
+                f"p95={getattr(det, 'reproj_p95', float('nan')):.2f}px"
+            )
+        return None
 
     def _nearest_frame_loader(self, src, lidar_topic: str, camera_topic: str,
                                times: list[int], max_sync_offset_ms: float):
@@ -331,10 +892,166 @@ class _Worker(QtCore.QObject):
     def cancel_perturbation(self):
         self._pert_cancel.set()
 
+    def open_holdout_bag(self, gen: int, bag: str, lidar_topic: str):
+        """Read a candidate hold-out bag's LiDAR message times -- the same
+        slow, once-per-bag read `open_bag` does for the main view, kept on
+        `_holdout_src` instead so it never evicts the main bag's reader (see
+        `_holdout_source`)."""
+        try:
+            src = self._holdout_source(bag)
+            times = src.timestamps(
+                lidar_topic,
+                progress=lambda done, total: self.holdout_bag_progress.emit(gen, done, total),
+            )
+            self.holdout_bag_ready.emit(gen, sorted(times))
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.holdout_bag_failed.emit(gen, f"{type(exc).__name__}: {exc}")
+
+    def _cached_source_for(self, bag: str) -> "BagSource | None":
+        """An already-open reader for `bag`, if one happens to be sitting on
+        `_src`/`_holdout_src` -- used only for the best-effort bag-signature
+        comparison below, which must never itself trigger opening (and so
+        possibly evicting, and possibly costing a slow re-scan of) a bag nobody
+        asked to open."""
+        if self._src is not None and str(self._src.path) == bag:
+            return self._src
+        if self._holdout_src is not None and str(self._holdout_src.path) == bag:
+            return self._holdout_src
+        return None
+
+    @staticmethod
+    def _bag_signature(src: BagSource, lidar_topic: str) -> "bag_reader.BagSignature":
+        """Built from an already-open `src` -- `.timestamps()` reuses its
+        per-topic cache when the caller already read it (true for both the
+        main view's and Hold-out's own readers by the time this runs), so
+        this costs only `inspect`'s index-only scan, not a second full read."""
+        stamps = src.timestamps(lidar_topic)
+        info = bag_reader.inspect(src.path)
+        return bag_reader.BagSignature(
+            file_size_bytes=bag_reader.path_size_bytes(src.path), duration_s=src.duration,
+            n_topics=len(info.topics), total_message_count=info.message_count,
+            first_lidar_timestamp_ns=stamps[0] if stamps else 0,
+            last_lidar_timestamp_ns=stamps[-1] if stamps else 0,
+        )
+
+    def _holdout_bag_signature_best_effort(self, src: BagSource, lidar_topic: str) -> "bag_reader.BagSignature | None":
+        """This Hold-out bag's own `BagSignature`, best-effort -- used both
+        to fold a copied bag into the same exposure Source
+        (`ho.resolve_source_identity`) and, when Discovery used a different
+        (already-cached) bag, to compare against it below. Never raises: a
+        signature that could not be computed just means neither of those
+        gets one, not that the run fails."""
+        try:
+            return self._bag_signature(src, lidar_topic)
+        except Exception:  # noqa: BLE001 - informational/identity only, never fails the run
+            return None
+
+    def _discovery_bag_signature_best_effort(self, req: "_HoldoutRequest",
+                                              holdout_sig: "bag_reader.BagSignature | None") -> "bag_reader.BagSignature | None":
+        """This Discovery bag's own `BagSignature`, best-effort -- see
+        `ho.DiscoveryProvenance.signature`'s docstring for why Candidate A/B
+        Test Package Export needs it. `holdout_sig` is reused outright when
+        Discovery and Hold-out are the same bag (no second read needed);
+        otherwise only attempted when Discovery's bag is already open under
+        a cached reader (see `_cached_source_for`), exactly like
+        `_discovery_comparison_notes` below -- never opens a bag freshly
+        just for this, and never fails the run.
+        """
+        if not req.discovery_bag:
+            return None
+        if ho.same_bag_identity(req.discovery_bag, req.bag):
+            return holdout_sig
+        discovery_src = self._cached_source_for(req.discovery_bag)
+        if discovery_src is None:
+            return None
+        try:
+            return self._bag_signature(discovery_src, req.lidar_topic)
+        except Exception:  # noqa: BLE001 - informational/identity only, never fails the run
+            return None
+
+    def _discovery_comparison_notes(self, req: "_HoldoutRequest",
+                                     holdout_sig: "bag_reader.BagSignature | None",
+                                     discovery_sig: "bag_reader.BagSignature | None") -> "tuple[str, str]":
+        """(signature_warning, cross_bag_time_overlap_note) -- both best-
+        effort and both purely informational (see
+        gui.core.evaluation.holdout's module docstring). `discovery_sig` is
+        whatever `_discovery_bag_signature_best_effort` already produced
+        (never recomputed here, so Discovery's bag is never read twice).
+        """
+        if holdout_sig is None or discovery_sig is None or ho.same_bag_identity(req.discovery_bag, req.bag):
+            return "", ""
+        warning = (
+            "Hold-out bag appears identical to the Discovery bag. Independent validation may be invalid."
+            if ho.signatures_suspiciously_similar(discovery_sig, holdout_sig) else ""
+        )
+        note = (
+            "Discovery and Hold-out bags have overlapping sensor time ranges. If they share a clock domain, "
+            "this may indicate overlapping recordings (informational only -- not confirmed)."
+            if ho.cross_bag_time_ranges_overlap(discovery_sig, holdout_sig) else ""
+        )
+        return warning, note
+
+    def run_holdout(self, req: "_HoldoutRequest"):
+        """Independent Hold-out Validation: prepare the hold-out frame set
+        once (image, cloud, timestamps, Canny/orientation cache -- see
+        `perturbation.prepare_frames`), then score baseline and the one
+        already-locked candidate against it with
+        `gui.core.evaluation.holdout.evaluate_holdout`. `req.axis`/`req.delta`/
+        `req.source_label` were fixed by the caller before this call was ever
+        made -- nothing here searches for, or adjusts, a candidate; nothing
+        here writes to a Solution, a project, or a file.
+        """
+        self._holdout_cancel.clear()
+        edge_params = ea.EdgeAlignmentParams()
+        try:
+            src = self._holdout_source(req.bag)
+            frame_loader = self._nearest_frame_loader(src, req.lidar_topic, req.camera_topic, req.times,
+                                                        req.max_sync_offset_ms)
+            frames = pert.prepare_frames(
+                frame_loader, n_total_timeline=len(req.times), n_samples=len(req.times),
+                max_sync_offset_ms=req.max_sync_offset_ms if req.max_sync_offset_ms > 0 else None,
+                edge_params=edge_params, should_cancel=self._holdout_cancel.is_set,
+                progress=lambda done, total: self.holdout_progress.emit(req.gen, "prepare", done, total),
+            )
+            candidate = ho.CandidateSpec(axis=req.axis, delta=req.delta, source=req.source_label)
+            # Computed once, always (not just when Discovery used a different
+            # bag): needed for exposure-registry Source identity regardless,
+            # and reused below for the Discovery-comparison notes and for
+            # ho.DiscoveryProvenance.signature (Candidate A/B Test Package
+            # Export provenance) too.
+            holdout_sig = self._holdout_bag_signature_best_effort(src, req.lidar_topic)
+            discovery_sig = self._discovery_bag_signature_best_effort(req, holdout_sig)
+            signature_warning, cross_bag_note = self._discovery_comparison_notes(req, holdout_sig, discovery_sig)
+            discovery = ho.DiscoveryProvenance(
+                bag=req.discovery_bag, timestamps=tuple(req.discovery_timestamps),
+                exclusion_margin_s=req.exclusion_margin_s, signature=discovery_sig,
+            ) if req.discovery_bag else None
+
+            result = ho.evaluate_holdout(
+                frames, req.baseline_R, req.baseline_t, candidate, req.camera,
+                min_range=req.min_range, max_range=req.max_range, edge_params=edge_params,
+                should_cancel=self._holdout_cancel.is_set,
+                progress=lambda done, total: self.holdout_progress.emit(req.gen, "evaluate", done, total),
+                discovery=discovery, holdout_bag=req.bag, holdout_signature=holdout_sig,
+                requested_timestamps=req.requested_timestamps, excluded_near_discovery=req.excluded_near_discovery,
+                signature_warning=signature_warning, cross_bag_time_overlap_note=cross_bag_note,
+                discovery_revision=req.discovery_revision,
+                bootstrap_iterations=req.bootstrap_iterations, bootstrap_block_s=req.bootstrap_block_s,
+            )
+            self.holdout_ready.emit(req.gen, result)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.holdout_failed.emit(req.gen, f"{type(exc).__name__}: {exc}")
+
+    def cancel_holdout(self):
+        self._holdout_cancel.set()
+
     def shutdown(self):
         if self._src is not None:
             self._src.close()
             self._src = None
+        if self._holdout_src is not None:
+            self._holdout_src.close()
+            self._holdout_src = None
 
 
 class _FrameSlider(QtWidgets.QSlider):
@@ -461,6 +1178,28 @@ class VerifyStep(StepPage):
         int, str, str, str, str, object, object, object, object, int, str, object,
         float, float, float, object, object,
     )
+    # gen, bag path, lidar topic -- Independent Hold-out Validation's own bag open
+    request_holdout_open = QtCore.Signal(int, str, str)
+    # a single _HoldoutRequest -- see its docstring for why this is bundled
+    # rather than yet another long positional-argument list
+    request_holdout = QtCore.Signal(object)
+    # gen, bag, camera topic, camera, target, samples, trans threshold mm, rot threshold deg
+    request_board_motion = QtCore.Signal(int, str, str, object, object, int, float, float)
+    # gen, bag, lidar topic, camera topic, camera, sol, times, samples, eval min/max, stable_only, stable_times
+    request_timestamp_diagnostic = QtCore.Signal(
+        int, str, str, str, object, object, object, int, float, float, bool, object
+    )
+    request_board_timestamp_diagnostic = QtCore.Signal(
+        int, str, str, str, object, object, object, object, object, int, object, str
+    )
+    # Emitted right after self.project.validation_history is updated in
+    # memory, following a Hold-out result actually being revealed --
+    # MainWindow listens for this to persist the project to its existing
+    # file path immediately (see main_window.py's
+    # _autosave_validation_history), since exposure history is provenance
+    # that should survive even if the user never presses "저장…". Carries no
+    # payload; the project object itself already holds the new state.
+    validation_history_changed = QtCore.Signal()
 
     def __init__(self, project: Project, parent=None):
         super().__init__(project, parent)
@@ -507,6 +1246,90 @@ class VerifyStep(StepPage):
         self._fine_T: tuple | None = None
         self._fine_mode: str = "multi_frame"
         self._diag_report: dg.DiagnosticReport | None = None
+        self._board_motion_gen = 0
+        self._board_motion_result: bm.BoardMotionResult | None = None
+        self._board_motion_stable_lidar_times: list[int] = []
+        self._tsdiag_gen = 0
+        self._tsdiag_results: list[td.TimestampDiagnosticMetrics] = []
+        self._board_ts_gen = 0
+        self._board_ts_result: bt.BoardTimestampResult | None = None
+
+        # Independent Hold-out Validation (see gui.core.evaluation.holdout).
+        # Discovery frame-timestamp sets, captured at the moment each run is
+        # launched (sample_frame_indices is a deterministic function of
+        # len(self._times) alone, so this needs no bag I/O) -- purely to let
+        # a later hold-out run check contamination; never influences what
+        # Perturbation/Fine Scan themselves score.
+        self._pert_discovery_bag: str | None = None
+        self._pert_discovery_timestamps: frozenset = frozenset()
+        self._pert_search_source: str = "full"  # "quick" | "full" -- which grid search produced self._pert_result
+        self._fine_discovery_bag: str | None = None
+        self._fine_discovery_timestamps: frozenset = frozenset()
+        self._holdout_bag_gen = 0
+        self._holdout_bag_path: str | None = None
+        self._holdout_times: list[int] = []
+        self._holdout_gen = 0
+        self._holdout_result: ho.HoldoutResult | None = None
+        self._holdout_T: tuple | None = None  # baseline (R, t) the locked candidate was compared against
+        # Project-persistent, monotonically increasing -- bumped by exactly 1
+        # only when a Perturbation Grid or Fine Scan run *successfully*
+        # produces a result (never on a failed/cancelled run, never on a
+        # Hold-out run itself, never on a mere combo-box selection -- see
+        # _note_discovery_success, called from _on_pert_ready/_on_fine_ready).
+        # Restored from self.project.validation_history's top-level
+        # "discovery_revision" on project sync (_sync_holdout_history_from_project),
+        # so it keeps counting up across an app restart instead of resetting
+        # to 0 -- see gui.core.evaluation.holdout.CandidateProvenance's
+        # docstring for exactly why a session-local counter here used to
+        # make the "Discovery moved on" check unreliable across a restart.
+        # Part of every locked candidate's provenance (see
+        # gui.core.evaluation.holdout.CandidateProvenance) and compared
+        # against the value a hold-out run locked in, to catch a result that
+        # has gone stale because Discovery moved on after it was shown. See
+        # _holdout_status below.
+        self._discovery_revision = 0
+        self._holdout_locked_discovery_revision = 0
+        # Session-level exposure history, keyed by content-based Source
+        # identity -- dict[source_identity, ho.HoldoutSourceExposure], each
+        # holding every slice (usable timestamp set) of that source ever
+        # revealed. A copied bag folds into the same Source
+        # (ho.resolve_source_identity); a heavily-overlapping resample folds
+        # into the same Slice (ho.classify_exposure) instead of looking like
+        # fresh, unseen data. Recorded only once a result is actually shown
+        # to a person (see _on_holdout_ready), never merely because a run
+        # started or finished. See gui.core.evaluation.holdout's module
+        # docstring and determine_and_record_exposure.
+        #
+        # Persisted, not just session-local: kept in sync with
+        # self.project.validation_history on every write (see
+        # _on_holdout_ready), so it survives Project.save/load and an app
+        # restart -- otherwise a Hold-out already peeked at in an earlier
+        # session could look Independent again simply because the process
+        # restarted. `_holdout_history_project` tracks which Project object
+        # this registry was last restored from, so switching to a different
+        # opened project (see main_window.py's _open, which rebinds
+        # self.project without recreating this page) is picked up the next
+        # time Step 7 is entered -- see _sync_holdout_history_from_project.
+        self._holdout_exposure_registry: dict = {}
+        self._holdout_history_project: Project | None = None
+        # This result's (B) classification against the registry above,
+        # frozen at the moment it was first shown -- combined with the live
+        # (A) discovery-staleness check in _holdout_status.
+        self._holdout_reveal_status: str = ho.STATUS_INDEPENDENT
+        # Kept in sync by main_window.py (mirroring how it already rebinds
+        # `self.project` on every page -- see `_open`/`_save`), purely so
+        # this page can tell whether `validation_history_changed` will
+        # actually reach disk yet. None until the project has been saved (or
+        # opened from) a file at least once.
+        self.project_path: Path | None = None
+
+        # Candidate A/B Test Package Export (see gui.core.evaluation.ab_export).
+        # Read-only repackaging of the Hold-out result above -- never a new
+        # evaluation, never a new calibration, never a new candidate search,
+        # never a write to the validated baseline. Remembers only the last
+        # export directory, purely so "폴더 열기" has somewhere to point;
+        # never influences what a later export produces.
+        self._last_ab_export_dir: Path | None = None
 
         # --- controls --------------------------------------------------------
         # Checking the extrinsic only at the scenes it was fitted to is marking
@@ -721,6 +1544,89 @@ class VerifyStep(StepPage):
             "6단계 RMSE와는 별개의 지표입니다.</span>"
         )
         self.eval_info_label.setWordWrap(True)
+
+        self.board_motion_info_label = QtWidgets.QLabel(
+            "<span style='color:palette(mid)'>Phase 1: detects camera board pose per frame, "
+            "then classifies board motion. This is analysis only; extrinsic files are not changed.</span>"
+        )
+        self.board_motion_info_label.setWordWrap(True)
+        self.board_motion_samples_spin = QtWidgets.QSpinBox()
+        self.board_motion_samples_spin.setRange(5, 5000)
+        self.board_motion_samples_spin.setValue(200)
+        self.board_motion_samples_spin.setToolTip("Camera frames sampled across the current bag")
+        self.board_motion_trans_spin = QtWidgets.QDoubleSpinBox()
+        self.board_motion_trans_spin.setRange(0.1, 100.0)
+        self.board_motion_trans_spin.setDecimals(1)
+        self.board_motion_trans_spin.setValue(5.0)
+        self.board_motion_trans_spin.setSuffix(" mm")
+        self.board_motion_rot_spin = QtWidgets.QDoubleSpinBox()
+        self.board_motion_rot_spin.setRange(0.001, 10.0)
+        self.board_motion_rot_spin.setDecimals(3)
+        self.board_motion_rot_spin.setValue(0.1)
+        self.board_motion_rot_spin.setSuffix(" deg")
+        self.board_motion_run_btn = QtWidgets.QPushButton("Run Board Motion Analysis")
+        self.board_motion_run_btn.clicked.connect(self._run_board_motion)
+        self.board_motion_cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.board_motion_cancel_btn.setVisible(False)
+        self.board_motion_cancel_btn.clicked.connect(self._cancel_board_motion)
+        self.board_motion_export_btn = QtWidgets.QPushButton("Export stable CSV")
+        self.board_motion_export_btn.setEnabled(False)
+        self.board_motion_export_btn.clicked.connect(self._export_board_motion_csv)
+        self.board_motion_stable_only_check = QtWidgets.QCheckBox("Use only stable board frames for Multi-frame")
+        self.board_motion_stable_only_check.setEnabled(False)
+        self.board_motion_progress_label = QtWidgets.QLabel("")
+        self.board_motion_progress_label.setStyleSheet("color: palette(mid);")
+        self.board_motion_summary_label = QtWidgets.QLabel("—")
+        self.board_motion_summary_label.setTextFormat(QtCore.Qt.RichText)
+        self.board_motion_summary_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
+        self.tsdiag_info_label = QtWidgets.QLabel(
+            "<span style='color:palette(mid)'>Diagnostic only: compares Record->Record, "
+            "Header->Sweep Start/Mid/End pairing. It does not apply a correction or overwrite calibration.</span>"
+        )
+        self.tsdiag_info_label.setWordWrap(True)
+        self.tsdiag_samples_spin = QtWidgets.QSpinBox()
+        self.tsdiag_samples_spin.setRange(5, 500)
+        self.tsdiag_samples_spin.setValue(100)
+        self.tsdiag_samples_spin.setToolTip("Frames sampled for each timestamp pairing mode")
+        self.tsdiag_stable_only_check = QtWidgets.QCheckBox("Stable-only")
+        self.tsdiag_run_btn = QtWidgets.QPushButton("Run Timestamp Diagnostic")
+        self.tsdiag_run_btn.clicked.connect(self._run_timestamp_diagnostic)
+        self.tsdiag_cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.tsdiag_cancel_btn.setVisible(False)
+        self.tsdiag_cancel_btn.clicked.connect(self._cancel_timestamp_diagnostic)
+        self.tsdiag_progress_label = QtWidgets.QLabel("")
+        self.tsdiag_progress_label.setStyleSheet("color: palette(mid);")
+        self.tsdiag_summary_label = QtWidgets.QLabel("—")
+        self.tsdiag_summary_label.setTextFormat(QtCore.Qt.RichText)
+        self.tsdiag_summary_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.tsdiag_detail_label = QtWidgets.QLabel("—")
+        self.tsdiag_detail_label.setTextFormat(QtCore.Qt.RichText)
+        self.tsdiag_detail_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.tsdiag_detail_label.setWordWrap(True)
+
+        self.board_ts_info_label = QtWidgets.QLabel(
+            "<span style='color:palette(mid)'>Uses existing ROI/auto-ROI and LiDAR board detector; "
+            "summarizes per-point timestamps of the detected board plane only. Analysis only.</span>"
+        )
+        self.board_ts_info_label.setWordWrap(True)
+        self.board_ts_samples_spin = QtWidgets.QSpinBox()
+        self.board_ts_samples_spin.setRange(5, 500)
+        self.board_ts_samples_spin.setValue(100)
+        self.board_ts_run_btn = QtWidgets.QPushButton("Run Board Timestamp Diagnostic")
+        self.board_ts_run_btn.clicked.connect(self._run_board_timestamp_diagnostic)
+        self.board_ts_cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.board_ts_cancel_btn.setVisible(False)
+        self.board_ts_cancel_btn.clicked.connect(self._cancel_board_timestamp_diagnostic)
+        self.board_ts_export_btn = QtWidgets.QPushButton("Export board timestamp CSV")
+        self.board_ts_export_btn.setEnabled(False)
+        self.board_ts_export_btn.clicked.connect(self._export_board_timestamp_csv)
+        self.board_ts_progress_label = QtWidgets.QLabel("")
+        self.board_ts_progress_label.setStyleSheet("color: palette(mid);")
+        self.board_ts_summary_label = QtWidgets.QLabel("—")
+        self.board_ts_summary_label.setTextFormat(QtCore.Qt.RichText)
+        self.board_ts_summary_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.board_ts_summary_label.setWordWrap(True)
 
         # Deliberately separate from near_spin/far_spin above (the display
         # range): reusing the display's projection would mean nudging that
@@ -946,6 +1852,185 @@ class VerifyStep(StepPage):
         self.fine_spatial_label.setTextFormat(QtCore.Qt.RichText)
         self.fine_spatial_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
 
+        # --- independent hold-out validation -----------------------------------
+        # See gui.core.evaluation.holdout's module docstring: a candidate is
+        # chosen from Discovery data (Perturbation Sensitivity / Fine Scan,
+        # via the axis combo above); this section only checks whether that
+        # *same, locked* candidate still looks better than baseline on data
+        # it was never searched against. Never fits T, never re-searches,
+        # never writes to self._sol, the project, or a file.
+        self.holdout_info_label = QtWidgets.QLabel(
+            "<span style='color:palette(mid)'>Candidate was selected using Discovery data.<br>"
+            "Hold-out data is used only for validation, not for candidate search.<br>"
+            "Re-running Fine Scan after seeing a hold-out result and locking a new candidate from it means "
+            "this hold-out no longer validates an untouched candidate.</span>"
+        )
+        self.holdout_info_label.setWordWrap(True)
+
+        self.holdout_persistence_note_label = QtWidgets.QLabel("")
+        self.holdout_persistence_note_label.setWordWrap(True)
+        self.holdout_persistence_note_label.setStyleSheet("color:#b26a00")
+
+        self.holdout_source_bag_radio = QtWidgets.QRadioButton("Separate Bag")
+        self.holdout_source_bag_radio.setChecked(True)
+        self.holdout_source_range_radio = QtWidgets.QRadioButton("Current Bag Time Range")
+        self._holdout_source_group = QtWidgets.QButtonGroup(self)
+        self._holdout_source_group.addButton(self.holdout_source_bag_radio)
+        self._holdout_source_group.addButton(self.holdout_source_range_radio)
+        self.holdout_source_bag_radio.toggled.connect(self._on_holdout_source_changed)
+
+        self.holdout_bag_combo = QtWidgets.QComboBox()
+        self.holdout_bag_combo.setToolTip(
+            "프로젝트에 추가된 bag 중에서 고르거나, '찾아보기…'로 다른 .bag 파일을 선택하세요.\n"
+            "가장 독립적인 검증은 calibration/Discovery 에 쓰이지 않은 별도 recording 입니다."
+        )
+        self.holdout_bag_combo.currentIndexChanged.connect(self._on_holdout_bag_combo_changed)
+        self.holdout_bag_status_label = QtWidgets.QLabel("—")
+        self.holdout_bag_status_label.setStyleSheet("color:palette(mid)")
+        self.holdout_bag_status_label.setWordWrap(True)
+
+        self.holdout_range_start_spin = QtWidgets.QDoubleSpinBox()
+        self.holdout_range_start_spin.setRange(0.0, 0.0)
+        self.holdout_range_start_spin.setDecimals(2)
+        self.holdout_range_start_spin.setSuffix(" s")
+        self.holdout_range_start_spin.setEnabled(False)
+        self.holdout_range_start_spin.valueChanged.connect(self._update_holdout_preview)
+
+        self.holdout_range_end_spin = QtWidgets.QDoubleSpinBox()
+        self.holdout_range_end_spin.setRange(0.0, 0.0)
+        self.holdout_range_end_spin.setDecimals(2)
+        self.holdout_range_end_spin.setSuffix(" s")
+        self.holdout_range_end_spin.setEnabled(False)
+        self.holdout_range_end_spin.valueChanged.connect(self._update_holdout_preview)
+
+        self.holdout_range_note = QtWidgets.QLabel("")
+        self.holdout_range_note.setStyleSheet("color:palette(mid)")
+        self.holdout_range_note.setWordWrap(True)
+        self.holdout_range_note.setVisible(False)
+
+        # Candidate lock -- axis is the same combo Perturbation/Fine Scan
+        # already use above (self.pert_axis_combo); only which *source*
+        # (Quick/Full grid vs Fine Scan) and which of its tested, non-zero
+        # deltas to lock are chosen here. The candidate actually used is
+        # frozen into the request at the moment "Hold-out 평가 실행" is
+        # pressed -- see _run_holdout -- so changing these combos afterward
+        # can never affect a run already in flight.
+        self.holdout_candidate_source_combo = QtWidgets.QComboBox()
+        self.holdout_candidate_source_combo.addItem("Perturbation Grid (Quick/Full)", "grid")
+        self.holdout_candidate_source_combo.addItem("Fine Scan", "fine")
+        self.holdout_candidate_source_combo.currentIndexChanged.connect(self._refresh_holdout_candidate_deltas)
+        self.pert_axis_combo.currentIndexChanged.connect(self._refresh_holdout_candidate_deltas)
+
+        self.holdout_delta_combo = QtWidgets.QComboBox()
+        self.holdout_delta_combo.setToolTip("Perturbation Sensitivity 또는 Fine Scan이 실제로 평가한 delta 중에서만 고릅니다.")
+        self.holdout_delta_combo.currentIndexChanged.connect(self._update_holdout_preview)
+
+        self.holdout_candidate_label = QtWidgets.QLabel("—")
+        self.holdout_candidate_label.setWordWrap(True)
+
+        self.holdout_frames_spin = QtWidgets.QSpinBox()
+        self.holdout_frames_spin.setRange(1, 2000)
+        self.holdout_frames_spin.setValue(50)
+        self.holdout_frames_spin.valueChanged.connect(self._update_holdout_preview)
+
+        # Temporal guard band -- see gui.core.evaluation.holdout.check_overlap.
+        # An exact-timestamp check alone is not a reliable independence test:
+        # adjacent frames from a moving vehicle can be nearly the same scene
+        # at different exact timestamps.
+        self.holdout_margin_spin = QtWidgets.QDoubleSpinBox()
+        self.holdout_margin_spin.setRange(0.0, 3600.0)
+        self.holdout_margin_spin.setDecimals(1)
+        self.holdout_margin_spin.setSuffix(" sec")
+        self.holdout_margin_spin.setValue(ho.DEFAULT_EXCLUSION_MARGIN_S)
+        self.holdout_margin_spin.setToolTip(
+            "Discovery frame 주변 이 시간 안의 Hold-out frame은 제외합니다 (같은 bag/시간 구간일 때만).\n"
+            "목적: 데이터 누수 방지. Bootstrap Block Duration(시간 상관 구조 반영)과는 별개의 설정이며\n"
+            "하나를 바꿔도 다른 하나는 바뀌지 않습니다.\n"
+            "Configurable heuristic default일 뿐, 검증된 절대 기준이 아닙니다."
+        )
+        self.holdout_margin_spin.valueChanged.connect(self._update_holdout_preview)
+
+        self.holdout_overlap_label = QtWidgets.QLabel("")
+        self.holdout_overlap_label.setWordWrap(True)
+
+        # Block bootstrap -- see gui.core.evaluation.holdout._run_block_bootstrap.
+        self.holdout_bootstrap_iter_spin = QtWidgets.QSpinBox()
+        self.holdout_bootstrap_iter_spin.setRange(100, 20000)
+        self.holdout_bootstrap_iter_spin.setSingleStep(100)
+        self.holdout_bootstrap_iter_spin.setValue(ho.DEFAULT_BOOTSTRAP_ITERATIONS)
+
+        self.holdout_bootstrap_block_spin = QtWidgets.QDoubleSpinBox()
+        self.holdout_bootstrap_block_spin.setRange(0.1, 300.0)
+        self.holdout_bootstrap_block_spin.setDecimals(1)
+        self.holdout_bootstrap_block_spin.setSuffix(" sec")
+        self.holdout_bootstrap_block_spin.setValue(ho.DEFAULT_BOOTSTRAP_BLOCK_S)
+        self.holdout_bootstrap_block_spin.setToolTip(
+            "Method: Non-overlapping Block Bootstrap.\n"
+            "연속된 주행 frame은 서로 상관되어 있어, 개별 frame을 독립 표본처럼 resampling하면\n"
+            "불확실성을 과소평가합니다. 이 시간 폭의 겹치지 않는 block 단위로만 resampling합니다.\n"
+            "Discovery Exclusion Margin(데이터 누수 방지)과는 별개의 설정입니다 -- 하나를 바꿔도\n"
+            "다른 하나는 바뀌지 않습니다.\n"
+            "Configurable heuristic default일 뿐, 검증된 절대 기준이 아닙니다."
+        )
+
+        self.holdout_run_btn = QtWidgets.QPushButton("Hold-out 평가 실행")
+        self.holdout_run_btn.setEnabled(False)
+        self.holdout_run_btn.clicked.connect(self._run_holdout)
+
+        self.holdout_cancel_btn = QtWidgets.QPushButton("취소")
+        self.holdout_cancel_btn.setVisible(False)
+        self.holdout_cancel_btn.clicked.connect(self._cancel_holdout)
+
+        self.holdout_progress_label = QtWidgets.QLabel("")
+        self.holdout_progress_label.setStyleSheet("color:palette(mid)")
+
+        self.holdout_status_label = QtWidgets.QLabel("")
+        self.holdout_status_label.setWordWrap(True)
+        self.holdout_status_label.setToolTip(
+            "Independent = 이 결과를 계산한 뒤 Perturbation/Fine Scan을 다시 실행하지 않았습니다.\n"
+            "Exploratory = 이 결과를 본 뒤 Discovery를 다시 실행했습니다 -- 더 이상 손대지 않은 후보에 대한\n"
+            "독립 검증으로 볼 수 없습니다."
+        )
+
+        self.holdout_summary_label = QtWidgets.QLabel("—")
+        self.holdout_summary_label.setTextFormat(QtCore.Qt.RichText)
+        self.holdout_summary_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
+        self.holdout_spatial_label = QtWidgets.QLabel("—")
+        self.holdout_spatial_label.setTextFormat(QtCore.Qt.RichText)
+        self.holdout_spatial_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
+        self.holdout_depth_label = QtWidgets.QLabel("—")
+        self.holdout_depth_label.setTextFormat(QtCore.Qt.RichText)
+        self.holdout_depth_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
+        # --- candidate A/B test package export ----------------------------------
+        # See gui.core.evaluation.ab_export's module docstring: packages the
+        # Hold-out comparison above into a reproducible directory for a real
+        # vehicle/projection/E2E pipeline to A/B baseline against candidate --
+        # never a new evaluation, never a new calibration, never a new
+        # candidate search, and never a write to the validated baseline. The
+        # actual precondition checks (current extrinsic still matches the
+        # locked baseline, recomputed candidate still matches its locked
+        # fingerprint) run inside _export_ab_package itself
+        # (ab_export.build_snapshot), not here -- this button is enabled
+        # whenever there is something worth trying to export.
+        self.ab_export_btn = QtWidgets.QPushButton("Candidate A/B Package 내보내기")
+        self.ab_export_btn.setEnabled(False)
+        self.ab_export_btn.setToolTip(
+            "현재 Baseline, 잠긴 Candidate, 이번 Hold-out 결과를 하나의 재현 가능한 디렉터리로 내보냅니다.\n"
+            "새로운 평가/calibration을 실행하지 않으며, 기존 baseline calibration을 절대 수정하지 않습니다."
+        )
+        self.ab_export_btn.clicked.connect(self._export_ab_package)
+
+        self.ab_export_open_btn = QtWidgets.QPushButton("폴더 열기")
+        self.ab_export_open_btn.setEnabled(False)
+        self.ab_export_open_btn.clicked.connect(self._open_ab_export_folder)
+
+        self.ab_export_status_label = QtWidgets.QLabel("")
+        self.ab_export_status_label.setWordWrap(True)
+        self.ab_export_status_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+
         # --- diagnostic evidence (interpretation only) -------------------------
         # Reads the results above as they already are; never re-projects,
         # re-scores, re-perturbs, or re-solves, and never offers to change T --
@@ -953,7 +2038,9 @@ class VerifyStep(StepPage):
         self.diag_info_label = QtWidgets.QLabel(
             "<span style='color:palette(mid)'>이미 계산된 결과만 해석합니다 — 원인을 확정하거나 "
             "T_cam_lidar를 수정하지 않습니다.<br>"
-            "<b>Evidence strength, not a calibration correctness score.</b></span>"
+            "<b>Evidence strength, not a calibration correctness score.</b><br>"
+            "Strength thresholds (0.05 px, 70%, ...) are configurable heuristic defaults for this project, "
+            "not sensor-validated correctness cut-offs — see DiagnosticThresholds.</span>"
         )
         self.diag_info_label.setWordWrap(True)
 
@@ -1030,6 +2117,56 @@ class VerifyStep(StepPage):
         eval_layout = QtWidgets.QVBoxLayout()
         eval_layout.addWidget(self.eval_info_label)
         eval_layout.addSpacing(6)
+        eval_layout.addWidget(QtWidgets.QLabel("<b>Board Motion Analysis</b>"))
+        eval_layout.addWidget(self.board_motion_info_label)
+        bm_samples_row = QtWidgets.QHBoxLayout()
+        bm_samples_row.addWidget(QtWidgets.QLabel("Samples"))
+        bm_samples_row.addWidget(self.board_motion_samples_spin)
+        eval_layout.addLayout(bm_samples_row)
+        bm_threshold_row = QtWidgets.QHBoxLayout()
+        bm_threshold_row.addWidget(QtWidgets.QLabel("Translation"))
+        bm_threshold_row.addWidget(self.board_motion_trans_spin)
+        bm_threshold_row.addWidget(QtWidgets.QLabel("Rotation"))
+        bm_threshold_row.addWidget(self.board_motion_rot_spin)
+        eval_layout.addLayout(bm_threshold_row)
+        bm_run_row = QtWidgets.QHBoxLayout()
+        bm_run_row.addWidget(self.board_motion_run_btn, 1)
+        bm_run_row.addWidget(self.board_motion_cancel_btn)
+        bm_run_row.addWidget(self.board_motion_export_btn)
+        eval_layout.addLayout(bm_run_row)
+        eval_layout.addWidget(self.board_motion_stable_only_check)
+        eval_layout.addWidget(self.board_motion_progress_label)
+        eval_layout.addWidget(self.board_motion_summary_label)
+        eval_layout.addSpacing(14)
+        eval_layout.addWidget(QtWidgets.QLabel("<b>Timestamp Diagnostic</b>"))
+        eval_layout.addWidget(self.tsdiag_info_label)
+        tsdiag_options_row = QtWidgets.QHBoxLayout()
+        tsdiag_options_row.addWidget(QtWidgets.QLabel("Samples"))
+        tsdiag_options_row.addWidget(self.tsdiag_samples_spin)
+        tsdiag_options_row.addWidget(self.tsdiag_stable_only_check)
+        eval_layout.addLayout(tsdiag_options_row)
+        tsdiag_run_row = QtWidgets.QHBoxLayout()
+        tsdiag_run_row.addWidget(self.tsdiag_run_btn, 1)
+        tsdiag_run_row.addWidget(self.tsdiag_cancel_btn)
+        eval_layout.addLayout(tsdiag_run_row)
+        eval_layout.addWidget(self.tsdiag_progress_label)
+        eval_layout.addWidget(self.tsdiag_summary_label)
+        eval_layout.addWidget(self.tsdiag_detail_label)
+        eval_layout.addSpacing(14)
+        eval_layout.addWidget(QtWidgets.QLabel("<b>Board Timestamp Diagnostic</b>"))
+        eval_layout.addWidget(self.board_ts_info_label)
+        board_ts_options_row = QtWidgets.QHBoxLayout()
+        board_ts_options_row.addWidget(QtWidgets.QLabel("Samples"))
+        board_ts_options_row.addWidget(self.board_ts_samples_spin)
+        eval_layout.addLayout(board_ts_options_row)
+        board_ts_run_row = QtWidgets.QHBoxLayout()
+        board_ts_run_row.addWidget(self.board_ts_run_btn, 1)
+        board_ts_run_row.addWidget(self.board_ts_cancel_btn)
+        board_ts_run_row.addWidget(self.board_ts_export_btn)
+        eval_layout.addLayout(board_ts_run_row)
+        eval_layout.addWidget(self.board_ts_progress_label)
+        eval_layout.addWidget(self.board_ts_summary_label)
+        eval_layout.addSpacing(14)
         eval_layout.addWidget(QtWidgets.QLabel("<b>평가 범위 (Evaluation Range)</b>"))
         eval_layout.addWidget(self.eval_range_note)
         eval_range_row = QtWidgets.QHBoxLayout()
@@ -1123,6 +2260,63 @@ class VerifyStep(StepPage):
         eval_layout.addWidget(QtWidgets.QLabel("Spatial (Baseline vs Lowest tested)"))
         eval_layout.addWidget(self.fine_spatial_label)
         eval_layout.addSpacing(14)
+        eval_layout.addWidget(QtWidgets.QLabel("<b>Independent Hold-out Validation</b>"))
+        eval_layout.addWidget(self.holdout_info_label)
+        eval_layout.addWidget(self.holdout_persistence_note_label)
+        eval_layout.addWidget(QtWidgets.QLabel("Source"))
+        holdout_source_row = QtWidgets.QHBoxLayout()
+        holdout_source_row.addWidget(self.holdout_source_bag_radio)
+        holdout_source_row.addWidget(self.holdout_source_range_radio)
+        eval_layout.addLayout(holdout_source_row)
+        eval_layout.addWidget(self.holdout_bag_combo)
+        eval_layout.addWidget(self.holdout_bag_status_label)
+        holdout_range_row = QtWidgets.QHBoxLayout()
+        holdout_range_row.addWidget(QtWidgets.QLabel("Start"))
+        holdout_range_row.addWidget(self.holdout_range_start_spin)
+        holdout_range_row.addWidget(QtWidgets.QLabel("End"))
+        holdout_range_row.addWidget(self.holdout_range_end_spin)
+        eval_layout.addLayout(holdout_range_row)
+        eval_layout.addWidget(self.holdout_range_note)
+        eval_layout.addWidget(QtWidgets.QLabel("Candidate"))
+        holdout_cand_row = QtWidgets.QHBoxLayout()
+        holdout_cand_row.addWidget(self.holdout_candidate_source_combo, 1)
+        holdout_cand_row.addWidget(self.holdout_delta_combo)
+        eval_layout.addLayout(holdout_cand_row)
+        eval_layout.addWidget(self.holdout_candidate_label)
+        holdout_frames_row = QtWidgets.QHBoxLayout()
+        holdout_frames_row.addWidget(QtWidgets.QLabel("Frames"))
+        holdout_frames_row.addWidget(self.holdout_frames_spin)
+        holdout_frames_row.addWidget(QtWidgets.QLabel("Discovery Exclusion Margin"))
+        holdout_frames_row.addWidget(self.holdout_margin_spin)
+        eval_layout.addLayout(holdout_frames_row)
+        eval_layout.addWidget(self.holdout_overlap_label)
+        eval_layout.addWidget(QtWidgets.QLabel("Bootstrap"))
+        holdout_bootstrap_row = QtWidgets.QHBoxLayout()
+        holdout_bootstrap_row.addWidget(QtWidgets.QLabel("Iterations"))
+        holdout_bootstrap_row.addWidget(self.holdout_bootstrap_iter_spin)
+        holdout_bootstrap_row.addWidget(QtWidgets.QLabel("Block Size"))
+        holdout_bootstrap_row.addWidget(self.holdout_bootstrap_block_spin)
+        eval_layout.addLayout(holdout_bootstrap_row)
+        holdout_run_row = QtWidgets.QHBoxLayout()
+        holdout_run_row.addWidget(self.holdout_run_btn, 1)
+        holdout_run_row.addWidget(self.holdout_cancel_btn)
+        eval_layout.addLayout(holdout_run_row)
+        eval_layout.addWidget(self.holdout_progress_label)
+        eval_layout.addWidget(self.holdout_status_label)
+        eval_layout.addWidget(QtWidgets.QLabel("Baseline vs Candidate"))
+        eval_layout.addWidget(self.holdout_summary_label)
+        eval_layout.addWidget(QtWidgets.QLabel("Spatial (Baseline vs Candidate)"))
+        eval_layout.addWidget(self.holdout_spatial_label)
+        eval_layout.addWidget(QtWidgets.QLabel("Depth (Baseline vs Candidate)"))
+        eval_layout.addWidget(self.holdout_depth_label)
+        eval_layout.addSpacing(10)
+        eval_layout.addWidget(QtWidgets.QLabel("<b>Candidate A/B Test Package</b>"))
+        ab_export_row = QtWidgets.QHBoxLayout()
+        ab_export_row.addWidget(self.ab_export_btn, 1)
+        ab_export_row.addWidget(self.ab_export_open_btn)
+        eval_layout.addLayout(ab_export_row)
+        eval_layout.addWidget(self.ab_export_status_label)
+        eval_layout.addSpacing(14)
         eval_layout.addWidget(QtWidgets.QLabel("<b>Diagnostic Evidence</b>"))
         eval_layout.addWidget(self.diag_info_label)
         diag_row = QtWidgets.QHBoxLayout()
@@ -1140,16 +2334,25 @@ class VerifyStep(StepPage):
         self.side_tabs = QtWidgets.QTabWidget()
         self.side_tabs.addTab(side_box, "검증")
         self.side_tabs.addTab(eval_scroll, "정량 평가")
-        self.side_tabs.setFixedWidth(360)
+        # A fixed width meant neither side could be dragged wider -- the
+        # projection canvas and the 검증/정량 평가 panel want different room
+        # depending on what's being read at the moment (a wide overlay vs a
+        # wide result table), so this is a QSplitter instead, the same
+        # draggable-divider pattern main_window.py already uses for its own
+        # nav/content split.
+        self.side_tabs.setMinimumWidth(300)
 
-        middle = QtWidgets.QHBoxLayout()
-        middle.addWidget(self.scroll, 1)
+        middle = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        middle.addWidget(self.scroll)
         middle.addWidget(self.side_tabs)
+        middle.setStretchFactor(0, 1)
+        middle.setSizes([900, 360])
+        middle.setChildrenCollapsible(False)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.addLayout(top)
         layout.addLayout(timeline)
-        layout.addLayout(middle, 1)
+        layout.addWidget(middle, 1)
 
         self._thread = QtCore.QThread(self)
         self._worker = _Worker()
@@ -1169,14 +2372,37 @@ class VerifyStep(StepPage):
         self._worker.fine_progress.connect(self._on_fine_progress)
         self._worker.fine_ready.connect(self._on_fine_ready)
         self._worker.fine_failed.connect(self._on_fine_failed)
+        self._worker.holdout_bag_progress.connect(self._on_holdout_bag_progress)
+        self._worker.holdout_bag_ready.connect(self._on_holdout_bag_ready)
+        self._worker.holdout_bag_failed.connect(self._on_holdout_bag_failed)
+        self._worker.holdout_progress.connect(self._on_holdout_progress)
+        self._worker.holdout_ready.connect(self._on_holdout_ready)
+        self._worker.holdout_failed.connect(self._on_holdout_failed)
+        self._worker.board_motion_progress.connect(self._on_board_motion_progress)
+        self._worker.board_motion_ready.connect(self._on_board_motion_ready)
+        self._worker.board_motion_failed.connect(self._on_board_motion_failed)
+        self._worker.tsdiag_progress.connect(self._on_timestamp_diagnostic_progress)
+        self._worker.tsdiag_ready.connect(self._on_timestamp_diagnostic_ready)
+        self._worker.tsdiag_failed.connect(self._on_timestamp_diagnostic_failed)
+        self._worker.board_ts_progress.connect(self._on_board_timestamp_progress)
+        self._worker.board_ts_ready.connect(self._on_board_timestamp_ready)
+        self._worker.board_ts_failed.connect(self._on_board_timestamp_failed)
         self.request_load.connect(self._worker.load)
         self.request_open.connect(self._worker.open_bag)
         self.request_multiframe.connect(self._worker.run_multiframe)
         self.request_eval_current.connect(self._worker.run_eval_current)
         self.request_perturbation.connect(self._worker.run_perturbation)
         self.request_fine_scan.connect(self._worker.run_fine_scan)
+        self.request_holdout_open.connect(self._worker.open_holdout_bag)
+        self.request_holdout.connect(self._worker.run_holdout)
+        self.request_board_motion.connect(self._worker.run_board_motion)
+        self.request_timestamp_diagnostic.connect(self._worker.run_timestamp_diagnostic)
+        self.request_board_timestamp_diagnostic.connect(self._worker.run_board_timestamp_diagnostic)
         self._thread.start()
         self._update_pert_trial_count()
+        self._on_holdout_source_changed()
+        self._refresh_holdout_candidate_deltas()
+        self._refresh_holdout_persistence_note()
 
     # ------------------------------------------------------------------ enter
 
@@ -1192,6 +2418,23 @@ class VerifyStep(StepPage):
             if combo is not None:
                 return combo.currentData()
         return DetectParams.method
+
+    def _symmetry_export_block_reason(self) -> str | None:
+        if self._loaded_from is not None:
+            return None
+        step = self._calibrate_step()
+        if step is None or getattr(step, "solution", None) is not self._sol:
+            return None
+        gate = getattr(step, "symmetry_gate", {}) or {}
+        decision = gate.get("decision")
+        if decision is None:
+            return None
+        if getattr(decision, "status", "") == "CALIBRATION_ACCEPTABLE":
+            return None
+        return (
+            "LiDAR target symmetry could not be uniquely resolved. "
+            f"Status: {decision.status}; source: {decision.selection_source}; reason: {decision.reason}"
+        )
 
     def _load_extrinsic(self):
         """Open a saved extrinsic and verify it against a recording.
@@ -1264,6 +2507,7 @@ class VerifyStep(StepPage):
         )
 
     def on_enter(self):
+        self._sync_holdout_history_from_project()
         # A loaded extrinsic stays until step 6 is run again -- it was opened on
         # purpose, and recomputing behind the user's back would discard it.
         if self._loaded_from is not None:
@@ -1291,6 +2535,54 @@ class VerifyStep(StepPage):
         self._fill_scenes()
         self._open_current_bag()
 
+    def _sync_holdout_history_from_project(self):
+        """Restore `self._holdout_exposure_registry` and
+        `self._discovery_revision` from `self.project.validation_history`
+        whenever `self.project` has changed identity since the last restore
+        -- a no-op otherwise, since the two are kept in sync on every write
+        (see `_persist_validation_history`), so re-parsing them again here
+        would be pure waste, not a correctness issue.
+
+        This is what makes a Hold-out already peeked at in an *earlier app
+        session* still register as exposed now: opening a project (see
+        main_window.py's `_open`, which rebinds `self.project` on every page
+        rather than recreating them) changes `self.project`'s identity, so
+        the next time Step 7 is entered its saved history -- and the
+        persistent Discovery revision counter -- are read back in, picking
+        up exactly where the previous session left off (e.g. revision 7 at
+        save time -> restart -> still 7 on restore -> the next successful
+        Discovery run makes it 8, never resetting to 0). A project that
+        predates this feature, or predates the revision counter
+        (`validation_history` schema v1/v2), restores to an empty registry
+        and `discovery_revision=0` -- ordinary, not an error (see
+        `ho.VALIDATION_HISTORY_SCHEMA_VERSION`'s migration-policy comment).
+        """
+        if self.project is self._holdout_history_project:
+            return
+        registry, discovery_revision, warnings = ho.deserialize_exposure_registry(
+            getattr(self.project, "validation_history", None)
+        )
+        self._holdout_exposure_registry = registry
+        self._discovery_revision = discovery_revision
+        self._holdout_history_project = self.project
+        for w in warnings:
+            self.window().statusBar().showMessage(w, 10000)
+        self._refresh_holdout_persistence_note()
+
+    def _refresh_holdout_persistence_note(self):
+        """`self.project_path` is kept in sync by MainWindow (mirroring how
+        it already rebinds `self.project` -- see `_open`/`_save`), so this is
+        just reading it, not guessing at anything this page cannot know.
+        Shown once a project exists on disk to *not* say anything (the
+        common case), rather than clutter the section with a permanent
+        "history is being saved" confirmation."""
+        if self.project_path is None:
+            self.holdout_persistence_note_label.setText(
+                "Validation history is session-only until this project is saved (\"저장…\")."
+            )
+        else:
+            self.holdout_persistence_note_label.setText("")
+
     def _current_bag(self) -> str:
         i = self.bag_combo.currentIndex()
         paths = self.project.bag_paths
@@ -1305,14 +2597,42 @@ class VerifyStep(StepPage):
         from pathlib import Path
 
         names = [Path(b).name for b in self.project.bag_paths]
-        if [self.bag_combo.itemText(i) for i in range(self.bag_combo.count())] == names:
+        if [self.bag_combo.itemText(i) for i in range(self.bag_combo.count())] != names:
+            keep = self.bag_combo.currentIndex()
+            self.bag_combo.blockSignals(True)
+            self.bag_combo.clear()
+            self.bag_combo.addItems(names)
+            self.bag_combo.setCurrentIndex(max(0, min(keep, len(names) - 1)))
+            self.bag_combo.blockSignals(False)
+        self._fill_holdout_bags()
+
+    def _fill_holdout_bags(self):
+        """Hold-out's own bag picker: every bag already in the project (the
+        recommended source -- see the module docstring's "Calibration bag /
+        Diagnostic bag / Hold-out bag" note), plus a "찾아보기…" entry for a
+        `.bag` not yet added to this project. Kept separate from
+        `self.bag_combo` so switching the main view's bag never changes what
+        hold-out is configured to read.
+        """
+        names = [Path(b).name for b in self.project.bag_paths] + ["찾아보기…"]
+        if [self.holdout_bag_combo.itemText(i) for i in range(self.holdout_bag_combo.count())] == names:
             return
-        keep = self.bag_combo.currentIndex()
-        self.bag_combo.blockSignals(True)
-        self.bag_combo.clear()
-        self.bag_combo.addItems(names)
-        self.bag_combo.setCurrentIndex(max(0, min(keep, len(names) - 1)))
-        self.bag_combo.blockSignals(False)
+        keep_path = self.holdout_bag_combo.currentData()
+        self.holdout_bag_combo.blockSignals(True)
+        self.holdout_bag_combo.clear()
+        for b in self.project.bag_paths:
+            self.holdout_bag_combo.addItem(Path(b).name, b)
+        self.holdout_bag_combo.addItem("찾아보기…", None)
+        idx = self.holdout_bag_combo.findData(keep_path) if keep_path else -1
+        self.holdout_bag_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.holdout_bag_combo.blockSignals(False)
+        # setCurrentIndex above never emits (it was blocked, or the index was
+        # already 0) -- open explicitly so a fresh project's first bag is
+        # ready without the user having to reselect it. Never for "찾아보기…"
+        # (data=None): that would pop a file dialog on page load.
+        current = self.holdout_bag_combo.currentData()
+        if current is not None and current != self._holdout_bag_path:
+            self._open_holdout_bag(current)
 
     def _fill_scenes(self):
         """Jump targets: the scenes captured from the bag currently shown."""
@@ -1357,6 +2677,7 @@ class VerifyStep(StepPage):
         if gen != self._gen:
             return
         self._times = list(times)
+        self._update_holdout_range_bounds()
         if not self._times:
             self.canvas.setText("이 bag 에 LiDAR 메시지가 없습니다.")
             return
@@ -1817,10 +3138,558 @@ class VerifyStep(StepPage):
         )
 
     @staticmethod
+    def _px_or_dash(v: float, signed: bool = False) -> str:
+        if not np.isfinite(v):
+            return "—"
+        return f"{v:+.2f} px" if signed else f"{v:.2f} px"
+
+    def _run_board_motion(self):
+        if not self._current_bag() or not self.project.camera_topic:
+            self.window().statusBar().showMessage("Load a bag and camera topic first.", 4000)
+            return
+        if not self.project.camera.is_set:
+            self.window().statusBar().showMessage("Camera intrinsics are required for board pose detection.", 5000)
+            return
+        self._board_motion_gen += 1
+        self._board_motion_result = None
+        self._board_motion_stable_lidar_times = []
+        self.board_motion_run_btn.setEnabled(False)
+        self.board_motion_cancel_btn.setVisible(True)
+        self.board_motion_export_btn.setEnabled(False)
+        self.board_motion_stable_only_check.setEnabled(False)
+        self.board_motion_stable_only_check.setChecked(False)
+        self.board_motion_progress_label.setText("Board motion analysis: 0 / ?")
+        self.board_motion_summary_label.setText("—")
+        self.request_board_motion.emit(
+            self._board_motion_gen,
+            self._current_bag(),
+            self.project.camera_topic,
+            self.project.camera,
+            self.project.target,
+            self.board_motion_samples_spin.value(),
+            self.board_motion_trans_spin.value(),
+            self.board_motion_rot_spin.value(),
+        )
+
+    def _cancel_board_motion(self):
+        self._worker.cancel_board_motion()
+        self.board_motion_progress_label.setText(self.board_motion_progress_label.text() + "  (cancel requested)")
+
+    def _on_board_motion_progress(self, gen: int, done: int, total: int):
+        if gen != self._board_motion_gen:
+            return
+        self.board_motion_progress_label.setText(f"Board motion analysis: {done} / {total}")
+
+    def _on_board_motion_ready(self, gen: int, result: "bm.BoardMotionResult"):
+        if gen != self._board_motion_gen:
+            return
+        self.board_motion_run_btn.setEnabled(True)
+        self.board_motion_cancel_btn.setVisible(False)
+        self._board_motion_result = result
+        self._board_motion_stable_lidar_times = self._stable_camera_to_lidar_times(result.stable_timestamps_ns)
+        self.board_motion_export_btn.setEnabled(bool(result.frames))
+        self.board_motion_stable_only_check.setEnabled(bool(self._board_motion_stable_lidar_times))
+        self.board_motion_summary_label.setText(self._board_motion_summary_html(result))
+        self.board_motion_progress_label.setText(f"Board motion complete: {result.total_detected} detected frames")
+
+    def _on_board_motion_failed(self, gen: int, msg: str):
+        if gen != self._board_motion_gen:
+            return
+        self.board_motion_run_btn.setEnabled(True)
+        self.board_motion_cancel_btn.setVisible(False)
+        self.board_motion_progress_label.setText("")
+        self.board_motion_summary_label.setText(f"<span style='color:#d9534f'>{html.escape(msg)}</span>")
+
+    def _stable_camera_to_lidar_times(self, camera_timestamps_ns: list[int]) -> list[int]:
+        if not camera_timestamps_ns or not self._times:
+            return []
+        lidar = np.asarray(self._times, dtype=np.int64)
+        picked = []
+        for cam_t in camera_timestamps_ns:
+            pos = int(np.searchsorted(lidar, cam_t))
+            candidates = []
+            if pos < len(lidar):
+                candidates.append(lidar[pos])
+            if pos > 0:
+                candidates.append(lidar[pos - 1])
+            if candidates:
+                picked.append(int(min(candidates, key=lambda t: abs(int(t) - cam_t))))
+        return sorted(set(picked))
+
+    def _export_board_motion_csv(self):
+        result = self._board_motion_result
+        if result is None or not result.frames:
+            return
+        RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        stem = self.project.name if self.project.name != "untitled" else "board_motion"
+        path = RESULT_DIR / f"{stem}_stable_board_frames.csv"
+        try:
+            bm.export_stable_frames_csv(result, path)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.window().statusBar().showMessage(f"CSV export failed: {type(exc).__name__}: {exc}", 7000)
+            return
+        self.window().statusBar().showMessage(f"Stable board frames exported: {path}", 7000)
+
+    def _board_motion_summary_html(self, result: "bm.BoardMotionResult") -> str:
+        if result.reason:
+            return f"<span style='color:palette(mid)'>{html.escape(result.reason)}</span>"
+        rows = [
+            ("Detected frames", f"{result.total_detected}"),
+            ("Stable / Marginal / Moving / Invalid",
+             f"{result.stable_frames} / {result.marginal_frames} / {result.moving_frames} / {result.invalid_frames}"),
+            ("Stable ratio", f"{result.stable_ratio * 100:.1f} %" if np.isfinite(result.stable_ratio) else "??"),
+            ("Valid / Invalid pose ratio",
+             f"{self._pct_text(result.valid_pose_ratio)} / {self._pct_text(result.invalid_pose_ratio)}"),
+            ("Stable LiDAR frames for Multi-frame", f"{len(self._board_motion_stable_lidar_times)}"),
+            (
+                "PnP reprojection RMS median / P95",
+                f"{self._px_or_dash(result.reproj_rms_median_px)} / {self._px_or_dash(result.reproj_rms_p95_px)}",
+            ),
+            (
+                "PnP reprojection median / P95-residual median / max P95",
+                f"{self._px_or_dash(result.reproj_median_px_median)} / "
+                f"{self._px_or_dash(result.reproj_p95_px_median)} / "
+                f"{self._px_or_dash(result.reproj_max_px_p95)}",
+            ),
+            (
+                "Translation median / P95 / max",
+                f"{result.translation_median_mm:.2f} / {result.translation_p95_mm:.2f} / {result.translation_max_mm:.2f} mm",
+            ),
+            (
+                "Translation P10 / P25 / P50 / P75 / P90 / P95 / max",
+                f"{result.translation_p10_mm:.2f} / {result.translation_p25_mm:.2f} / "
+                f"{result.translation_median_mm:.2f} / {result.translation_p75_mm:.2f} / "
+                f"{result.translation_p90_mm:.2f} / {result.translation_p95_mm:.2f} / "
+                f"{result.translation_max_mm:.2f} mm",
+            ),
+            (
+                "Rotation median / P95 / max",
+                f"{result.rotation_median_deg:.3f} / {result.rotation_p95_deg:.3f} / {result.rotation_max_deg:.3f} deg",
+            ),
+            (
+                "Rotation P10 / P25 / P50 / P75 / P90 / P95 / max",
+                f"{result.rotation_p10_deg:.3f} / {result.rotation_p25_deg:.3f} / "
+                f"{result.rotation_median_deg:.3f} / {result.rotation_p75_deg:.3f} / "
+                f"{result.rotation_p90_deg:.3f} / {result.rotation_p95_deg:.3f} / "
+                f"{result.rotation_max_deg:.3f} deg",
+            ),
+            (
+                "Translation velocity median / P95 / max",
+                f"{result.translation_velocity_median_mm_s:.1f} / {result.translation_velocity_p95_mm_s:.1f} / "
+                f"{result.translation_velocity_max_mm_s:.1f} mm/s",
+            ),
+            (
+                "Rotation velocity median / P95 / max",
+                f"{result.rotation_velocity_median_deg_s:.2f} / {result.rotation_velocity_p95_deg_s:.2f} / "
+                f"{result.rotation_velocity_max_deg_s:.2f} deg/s",
+            ),
+        ]
+        if result.stable_segments:
+            segs = ", ".join(
+                f"#{i + 1} {s.start_frame_index}-{s.end_frame_index} ({s.duration_s:.2f}s)"
+                for i, s in enumerate(result.stable_segments[:5])
+            )
+            rows.append(("Stable segments", html.escape(segs)))
+        else:
+            rows.append(("Stable segments", "none"))
+        return self._rows_table(rows)
+
+    def _run_timestamp_diagnostic(self):
+        sol = self._effective()
+        if sol is None or not sol.ok:
+            self.window().statusBar().showMessage(
+                "An extrinsic is required for timestamp diagnostic.", 5000
+            )
+            return
+        if not self._times:
+            self.window().statusBar().showMessage("Load a bag first.", 4000)
+            return
+        stable_only = self.tsdiag_stable_only_check.isChecked()
+        if stable_only and not self._board_motion_stable_lidar_times:
+            self.window().statusBar().showMessage(
+                "Run Board Motion Analysis first; no stable frames are available.", 5000
+            )
+            return
+        self._tsdiag_gen += 1
+        self._tsdiag_results = []
+        self.tsdiag_run_btn.setEnabled(False)
+        self.tsdiag_cancel_btn.setVisible(True)
+        self.tsdiag_progress_label.setText("Timestamp diagnostic: preparing...")
+        self.tsdiag_summary_label.setText("—")
+        self.tsdiag_detail_label.setText("—")
+        p = self.project
+        self.request_timestamp_diagnostic.emit(
+            self._tsdiag_gen,
+            self._current_bag(),
+            p.lidar_topic,
+            p.camera_topic,
+            p.camera,
+            sol,
+            list(self._times),
+            self.tsdiag_samples_spin.value(),
+            self.eval_min_range_spin.value(),
+            self.eval_max_range_spin.value(),
+            stable_only,
+            list(self._board_motion_stable_lidar_times),
+        )
+
+    def _cancel_timestamp_diagnostic(self):
+        self._worker.cancel_timestamp_diagnostic()
+        self.tsdiag_progress_label.setText(self.tsdiag_progress_label.text() + "  (cancel requested)")
+
+    def _on_timestamp_diagnostic_progress(self, gen: int, phase: str, done: int, total: int):
+        if gen != self._tsdiag_gen:
+            return
+        self.tsdiag_progress_label.setText(f"Timestamp diagnostic {phase}: {done} / {total}")
+
+    def _on_timestamp_diagnostic_ready(self, gen: int, results: list):
+        if gen != self._tsdiag_gen:
+            return
+        self.tsdiag_run_btn.setEnabled(True)
+        self.tsdiag_cancel_btn.setVisible(False)
+        self._tsdiag_results = results
+        self.tsdiag_progress_label.setText(f"Timestamp diagnostic complete: {len(results)} modes")
+        self.tsdiag_summary_label.setText(self._timestamp_diagnostic_summary_html(results))
+        self.tsdiag_detail_label.setText(self._timestamp_diagnostic_detail_html(results))
+
+    def _on_timestamp_diagnostic_failed(self, gen: int, msg: str):
+        if gen != self._tsdiag_gen:
+            return
+        self.tsdiag_run_btn.setEnabled(True)
+        self.tsdiag_cancel_btn.setVisible(False)
+        self.tsdiag_progress_label.setText("")
+        self.tsdiag_summary_label.setText(f"<span style='color:#d9534f'>{html.escape(msg)}</span>")
+
+    def _run_board_timestamp_diagnostic(self):
+        sol = self._effective()
+        if sol is None or not sol.ok:
+            self.window().statusBar().showMessage(
+                "An extrinsic is required for board timestamp diagnostic.", 5000
+            )
+            return
+        if not self._times:
+            self.window().statusBar().showMessage("Load a bag first.", 4000)
+            return
+        self._board_ts_gen += 1
+        self._board_ts_result = None
+        self.board_ts_export_btn.setEnabled(False)
+        self.board_ts_run_btn.setEnabled(False)
+        self.board_ts_cancel_btn.setVisible(True)
+        self.board_ts_progress_label.setText("Board timestamp diagnostic: preparing...")
+        self.board_ts_summary_label.setText("—")
+        p = self.project
+        self.request_board_timestamp_diagnostic.emit(
+            self._board_ts_gen,
+            self._current_bag(),
+            p.lidar_topic,
+            p.camera_topic,
+            p.camera,
+            p.target,
+            sol,
+            list(self._times),
+            list(p.scenes),
+            self.board_ts_samples_spin.value(),
+            list(self._board_motion_stable_lidar_times),
+            self._method(),
+        )
+
+    def _cancel_board_timestamp_diagnostic(self):
+        self._worker.cancel_board_timestamp_diagnostic()
+        self.board_ts_progress_label.setText(
+            self.board_ts_progress_label.text() + "  (cancel requested)"
+        )
+
+    def _on_board_timestamp_progress(self, gen: int, done: int, total: int):
+        if gen != self._board_ts_gen:
+            return
+        self.board_ts_progress_label.setText(f"Board timestamp diagnostic: {done} / {total}")
+
+    def _on_board_timestamp_ready(self, gen: int, result: "bt.BoardTimestampResult"):
+        if gen != self._board_ts_gen:
+            return
+        self.board_ts_run_btn.setEnabled(True)
+        self.board_ts_cancel_btn.setVisible(False)
+        self._board_ts_result = result
+        self.board_ts_export_btn.setEnabled(bool(result.frames))
+        self.board_ts_progress_label.setText(
+            f"Board timestamp diagnostic complete: {len(result.frames)} valid, {result.failed_frames} failed"
+        )
+        self.board_ts_summary_label.setText(self._board_timestamp_summary_html(result))
+
+    def _on_board_timestamp_failed(self, gen: int, msg: str):
+        if gen != self._board_ts_gen:
+            return
+        self.board_ts_run_btn.setEnabled(True)
+        self.board_ts_cancel_btn.setVisible(False)
+        self.board_ts_export_btn.setEnabled(False)
+        self.board_ts_progress_label.setText("")
+        self.board_ts_summary_label.setText(f"<span style='color:#d9534f'>{html.escape(msg)}</span>")
+
+    def _export_board_timestamp_csv(self):
+        result = self._board_ts_result
+        if result is None or not result.frames:
+            return
+        RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        stem = self.project.name if self.project.name != "untitled" else "board_timestamp"
+        path = RESULT_DIR / f"{stem}_board_timestamps.csv"
+        try:
+            bt.export_frames_csv(result, path)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.window().statusBar().showMessage(
+                f"Board timestamp CSV export failed: {type(exc).__name__}: {exc}", 7000
+            )
+            return
+        self.window().statusBar().showMessage(f"Board timestamps exported: {path}", 7000)
+
+    def _board_timestamp_summary_html(self, result: "bt.BoardTimestampResult") -> str:
+        if not result.frames:
+            detail = html.escape(result.reason or "No valid board timestamp frames.")
+            return f"<span style='color:palette(mid)'>{detail}</span>"
+        parts = [
+            "<span style='color:palette(mid)'>camera_header - lidar_reference. "
+            "Positive means the camera timestamp is later than the LiDAR board acquisition time.</span>"
+        ]
+        parts.append("<b>ALL frames</b>")
+        parts.append(self._board_timestamp_stats_table(result.all_stats))
+        parts.append("<b>Board-Time Camera Pairing Diagnostic</b>")
+        parts.append(self._board_timestamp_pairing_table(result.all_stats))
+        parts.append("<b>LiDAR target detection stages</b>")
+        parts.append(self._board_timestamp_detection_table(result))
+        stable = result.stable_stats
+        parts.append("<b>Stable-only</b>")
+        if stable.get("n", 0):
+            parts.append(self._board_timestamp_stats_table(stable))
+        else:
+            parts.append(
+                "<span style='color:palette(mid)'>No stable frames in this run. "
+                "Run Phase 1 Board Motion Analysis first to populate stable-only status.</span>"
+            )
+        low_motion = self._board_timestamp_low_motion_html(result)
+        if low_motion:
+            parts.append("<b>Low-motion subsets</b>")
+            parts.append(low_motion)
+        if result.failed_frames:
+            parts.append(
+                f"<span style='color:palette(mid)'>Skipped frames without reusable board point timestamps: "
+                f"{result.failed_frames}</span>"
+            )
+        return "<br>".join(parts)
+
+    def _board_timestamp_stats_table(self, stats: dict) -> str:
+        def ts(name: str):
+            return stats.get(name, td.TimestampStats())
+
+        start = ts("camera_to_sweep_start")
+        mid = ts("camera_to_sweep_mid")
+        end = ts("camera_to_sweep_end")
+        board = ts("camera_to_board_median")
+        nearest = ts("nearest_to_board")
+        pos = ts("board_offset_from_start")
+        span = ts("board_span")
+        rows = [
+            ("Frames", f"{stats.get('n', 0)}"),
+            (
+                "Camera Header -> Sweep Start mean / median / std / P95(abs)",
+                f"{self._signed_ms_text(start.mean_ms)} / {self._signed_ms_text(start.median_ms)} / "
+                f"{self._ms_text(start.std_ms)} / {self._ms_text(start.p95_abs_ms)}",
+            ),
+            (
+                "Camera Header -> Sweep Mid mean / median / std / P95(abs)",
+                f"{self._signed_ms_text(mid.mean_ms)} / {self._signed_ms_text(mid.median_ms)} / "
+                f"{self._ms_text(mid.std_ms)} / {self._ms_text(mid.p95_abs_ms)}",
+            ),
+            (
+                "Camera Header -> Sweep End mean / median / std / P95(abs)",
+                f"{self._signed_ms_text(end.mean_ms)} / {self._signed_ms_text(end.median_ms)} / "
+                f"{self._ms_text(end.std_ms)} / {self._ms_text(end.p95_abs_ms)}",
+            ),
+            (
+                "Camera Header -> Board Median mean / median / std / P95(abs)",
+                f"{self._signed_ms_text(board.mean_ms)} / {self._signed_ms_text(board.median_ms)} / "
+                f"{self._ms_text(board.std_ms)} / {self._ms_text(board.p95_abs_ms)}",
+            ),
+            (
+                "Header-nearest Camera -> Board Median mean / median / std / P95(abs)",
+                f"{self._signed_ms_text(nearest.mean_ms)} / {self._signed_ms_text(nearest.median_ms)} / "
+                f"{self._ms_text(nearest.std_ms)} / {self._ms_text(nearest.p95_abs_ms)}",
+            ),
+            (
+                "Camera Header -> Board Median min / max",
+                f"{self._signed_ms_text(board.min_ms)} / {self._signed_ms_text(board.max_ms)}",
+            ),
+            (
+                "Board Median offset from Sweep Start mean / median / std",
+                f"{self._ms_text(pos.mean_ms)} / {self._ms_text(pos.median_ms)} / {self._ms_text(pos.std_ms)}",
+            ),
+            (
+                "Board point span mean / median / P95",
+                f"{self._ms_text(span.mean_ms)} / {self._ms_text(span.median_ms)} / {self._ms_text(span.p95_abs_ms)}",
+            ),
+            (
+                "Board point count mean / median",
+                f"{stats.get('board_point_count_mean', float('nan')):.1f} / "
+                f"{stats.get('board_point_count_median', float('nan')):.1f}",
+            ),
+        ]
+        return self._rows_table(rows)
+
+    def _board_timestamp_pairing_table(self, stats: dict) -> str:
+        current = stats.get("camera_to_board_median", td.TimestampStats())
+        nearest = stats.get("nearest_to_board", td.TimestampStats())
+        rows = [
+            ("Current Record Pair mean / median / std / P95(abs) / min / max",
+             f"{self._signed_ms_text(current.mean_ms)} / {self._signed_ms_text(current.median_ms)} / "
+             f"{self._ms_text(current.std_ms)} / {self._ms_text(current.p95_abs_ms)} / "
+             f"{self._signed_ms_text(current.min_ms)} / {self._signed_ms_text(current.max_ms)}"),
+            ("Header-Nearest Pair mean / median / std / P95(abs) / min / max",
+             f"{self._signed_ms_text(nearest.mean_ms)} / {self._signed_ms_text(nearest.median_ms)} / "
+             f"{self._ms_text(nearest.std_ms)} / {self._ms_text(nearest.p95_abs_ms)} / "
+             f"{self._signed_ms_text(nearest.min_ms)} / {self._signed_ms_text(nearest.max_ms)}"),
+            ("Same / Previous / Next camera frame selected",
+             f"{self._pct_text(stats.get('same_camera_frame_ratio', float('nan')))} / "
+             f"{self._pct_text(stats.get('previous_camera_frame_ratio', float('nan')))} / "
+             f"{self._pct_text(stats.get('next_camera_frame_ratio', float('nan')))}"),
+            ("Camera index shift histogram (-2/-1/0/+1/+2)",
+             self._shift_hist_text(stats.get("shift_histogram", {}))),
+        ]
+        return self._rows_table(rows)
+
+    def _board_timestamp_detection_table(self, result: "bt.BoardTimestampResult") -> str:
+        n = max(1, int(result.processed_frames or (len(result.frames) + result.failed_frames)))
+        rows = [
+            ("Processed frames", str(result.processed_frames or (len(result.frames) + result.failed_frames))),
+            ("Plane detection success", f"{result.plane_detection_success} ({result.plane_detection_success / n * 100:.1f} %)"),
+            ("Enough plane points", f"{result.enough_plane_points_success} ({result.enough_plane_points_success / n * 100:.1f} %)"),
+            ("Circle/hole candidate stage", f"{result.circle_candidate_success} ({result.circle_candidate_success / n * 100:.1f} %)"),
+            (">=4 circle/hole detections", f"{result.four_or_more_circles_success} ({result.four_or_more_circles_success / n * 100:.1f} %)"),
+            ("Geometry validation passed", f"{result.geometry_validation_success} ({result.geometry_validation_success / n * 100:.1f} %)"),
+            ("Four-hole/full target detection success", f"{result.full_target_detection_success} ({result.full_target_detection_success / n * 100:.1f} %)"),
+            ("Board timestamp valid", f"{result.board_timestamp_valid_count} ({result.board_timestamp_valid_count / n * 100:.1f} %)"),
+            ("Board pose valid", f"{result.board_pose_valid_count} ({result.board_pose_valid_count / n * 100:.1f} %)"),
+        ]
+        if result.lidar_failure_reasons:
+            reasons = sorted(result.lidar_failure_reasons.items(), key=lambda kv: kv[1], reverse=True)
+            rows.append(("Top LiDAR failure reasons", "; ".join(f"{html.escape(k)}: {v}" for k, v in reasons[:5])))
+        return self._rows_table(rows)
+
+    def _board_timestamp_low_motion_html(self, result: "bt.BoardTimestampResult") -> str:
+        motion = self._board_motion_result
+        if motion is None or not motion.frames:
+            return ""
+        rows = []
+        for label, frac in (("LOW MOTION 10%", 0.10), ("LOW MOTION 20%", 0.20), ("LOW MOTION 30%", 0.30)):
+            idx = bm.low_motion_frame_indices(motion, frac)
+            frames = [f for f in result.frames if f.current_camera_index in idx]
+            stats = bt.summarize(frames)
+            current = stats["camera_to_board_median"]
+            nearest = stats["nearest_to_board"]
+            rows.append((
+                label,
+                f"n={stats['n']} | current median/P95 {self._signed_ms_text(current.median_ms)} / "
+                f"{self._ms_text(current.p95_abs_ms)} | header-nearest median/P95 "
+                f"{self._signed_ms_text(nearest.median_ms)} / {self._ms_text(nearest.p95_abs_ms)}",
+            ))
+        return self._rows_table(rows)
+
+    @staticmethod
+    def _shift_hist_text(hist: dict) -> str:
+        return " / ".join(str(int(hist.get(k, 0))) for k in (-2, -1, 0, 1, 2))
+
+    def _timestamp_diagnostic_summary_html(self, results: list) -> str:
+        if not results:
+            return "<span style='color:palette(mid)'>No result.</span>"
+        rows = [
+            "<table cellspacing='4'>"
+            "<tr><th>Mode</th><th>Matched Mean</th><th>Matched Median</th><th>Match Rate</th>"
+            "<th>Within 5px</th><th>Within 10px</th><th>Median du</th><th>Median dv</th>"
+            "<th>Median Sync</th><th>P95 Sync</th></tr>"
+        ]
+        for r in results:
+            rows.append(
+                "<tr>"
+                f"<td>{html.escape(td.PAIRING_LABELS.get(r.mode, str(r.mode)))}</td>"
+                f"<td align='right'>{self._px_or_dash(r.matched_mean_px)}</td>"
+                f"<td align='right'>{self._px_or_dash(r.matched_median_px)}</td>"
+                f"<td align='right'>{self._pct_text(r.match_rate_mean)}</td>"
+                f"<td align='right'>{self._pct_text(r.within_5px)}</td>"
+                f"<td align='right'>{self._pct_text(r.within_10px)}</td>"
+                f"<td align='right'>{self._px_or_dash(r.median_delta_u_px, signed=True)}</td>"
+                f"<td align='right'>{self._px_or_dash(r.median_delta_v_px, signed=True)}</td>"
+                f"<td align='right'>{self._signed_ms_text(r.sync_stats.median_ms)}</td>"
+                f"<td align='right'>{self._ms_text(r.sync_stats.p95_abs_ms)}</td>"
+                "</tr>"
+            )
+        rows.append("</table>")
+        rows.append(
+            "<span style='color:palette(mid)'>sync_offset_ms = camera_acquisition_time - lidar_reference_time. "
+            "Positive means the camera timestamp is later.</span>"
+        )
+        return "".join(rows)
+
+    def _timestamp_diagnostic_detail_html(self, results: list) -> str:
+        parts = []
+        for r in results:
+            rows = [
+                ("Frames valid / total", f"{r.n_valid} / {r.n_total}"),
+                ("Penalty Mean / Median / P95", f"{r.mean_px:.2f} / {r.median_px:.2f} / {r.p95_px:.2f} px"),
+                ("Matched P95 / P99 / Max", f"{self._px_or_dash(r.matched_p95_px)} / {self._px_or_dash(r.matched_p99_px)} / {self._px_or_dash(r.matched_max_px)}"),
+                ("Matched STD", self._px_or_dash(r.matched_std_px)),
+                ("Within 2 / 3 / 5 / 10 / 15 px",
+                 f"{self._pct_text(r.within_2px)} / {self._pct_text(r.within_3px)} / "
+                 f"{self._pct_text(r.within_5px)} / {self._pct_text(r.within_10px)} / {self._pct_text(r.within_15px)}"),
+                ("Sync mean / median / std / P95(abs)",
+                 f"{self._signed_ms_text(r.sync_stats.mean_ms)} / {self._signed_ms_text(r.sync_stats.median_ms)} / "
+                 f"{self._ms_text(r.sync_stats.std_ms)} / {self._ms_text(r.sync_stats.p95_abs_ms)}"),
+            ]
+            if r.reason:
+                rows.append(("Warning", html.escape(r.reason)))
+            parts.append(f"<b>{html.escape(td.PAIRING_LABELS.get(r.mode, str(r.mode)))}</b>")
+            parts.append(self._rows_table(rows))
+            if r.horizontal:
+                parts.append("Spatial<br>" + self._rows_table([
+                    (k, self._timestamp_bin_text(v)) for k, v in r.horizontal.items()
+                ]))
+            if r.depth:
+                wanted = [k for k in ("0-10m", "10-20m", "20-30m") if k in r.depth]
+                parts.append("Depth<br>" + self._rows_table([
+                    (k, self._timestamp_bin_text(r.depth[k])) for k in wanted
+                ]))
+        return "<br>".join(parts) if parts else "—"
+
+    def _timestamp_bin_text(self, b: dict) -> str:
+        return (
+            f"{self._px_or_dash(b.get('matched_mean_px', float('nan')))} matched, "
+            f"{self._pct_text(b.get('match_rate', float('nan')))} match, "
+            f"du {self._px_or_dash(b.get('median_delta_u_px', float('nan')), signed=True)}, "
+            f"dv {self._px_or_dash(b.get('median_delta_v_px', float('nan')), signed=True)}"
+        )
+
+    @staticmethod
+    def _pct_text(value: float) -> str:
+        return f"{value * 100:.1f} %" if np.isfinite(value) else "??"
+
+    @staticmethod
     def _bin_text(stats) -> str:
+        """Matched-only mean is shown first and bold -- per requirement,
+        spatial/depth comparison reads matched-only by default -- with the
+        existing penalty-inclusive mean kept right below it (muted, not
+        removed) so neither number is lost. Signed Δu/Δv, when this bin has
+        any, are shown on a third line: a region/depth-bin-local systematic
+        offset is exactly the kind of thing a single overall number hides.
+        """
         if stats.n_points == 0:
             return "—"
-        return f"{stats.mean_px:.2f} px  (n={stats.n_points:,})"
+        matched = VerifyStep._px_or_dash(stats.matched_mean_px)
+        rate = f"{stats.match_rate * 100:.0f}%" if np.isfinite(stats.match_rate) else "—"
+        lines = [
+            f"<b>{matched}</b> <span style='color:palette(mid)'>matched · {rate} match</span>",
+            f"<span style='color:palette(mid)'>penalty-incl {stats.mean_px:.2f} px (n={stats.n_points:,})</span>",
+        ]
+        if np.isfinite(stats.mean_delta_u_px) or np.isfinite(stats.mean_delta_v_px):
+            du = VerifyStep._px_or_dash(stats.mean_delta_u_px, signed=True)
+            dv = VerifyStep._px_or_dash(stats.mean_delta_v_px, signed=True)
+            lines.append(f"<span style='color:palette(mid)'>Δu {du} / Δv {dv}</span>")
+        return "<br>".join(lines)
 
     def _eval_current_frame(self):
         """Score the frame already on screen.
@@ -1867,6 +3736,57 @@ class VerifyStep(StepPage):
         self.eval_spatial_label.setText("—")
         self.eval_depth_label.setText("—")
 
+    @staticmethod
+    def _edge_alignment_summary_html(result: "ea.EdgeAlignmentResult") -> str:
+        """Penalty-inclusive and Matched-only are shown as two clearly
+        labelled, separate blocks -- never merged into one number -- per the
+        requirement that a badly-matched scene's inflated Penalty-inclusive
+        Mean must never be read as if it were the same thing as
+        Matched-only Mean. See edge_alignment.EdgeAlignmentResult's own
+        docstring for what each family means.
+        """
+        px = VerifyStep._px_or_dash
+        out = (
+            "<b>Penalty-inclusive</b> "
+            "<span style='color:palette(mid)'>(unmatched points count at the largest search radius)</span><br>"
+            + VerifyStep._rows_table([
+                ("Mean", f"{result.mean_px:.2f} px"),
+                ("Median", f"{result.median_px:.2f} px"),
+                ("P95", f"{result.p95_px:.2f} px"),
+                ("Max", f"{result.max_px:.2f} px"),
+            ])
+            + "<b>Matched-only</b> <span style='color:palette(mid)'>(unmatched points excluded entirely)</span><br>"
+            + VerifyStep._rows_table([
+                ("Mean", px(result.matched_mean_px)),
+                ("Median", px(result.matched_median_px)),
+                ("P95", px(result.matched_p95_px)),
+                ("P99", px(result.matched_p99_px)),
+                ("Max", px(result.matched_max_px)),
+                ("Matched Count", f"{result.n_matched:,}"),
+            ])
+            + VerifyStep._rows_table([
+                ("Match Rate", f"{result.match_rate * 100:.1f} %"),
+                ("Edge Points", f"{result.n_edge_points:,}"),
+                ("Matched / Unmatched", f"{result.n_matched:,} / {result.n_unmatched:,}"),
+            ])
+        )
+        if result.match_rate_by_threshold_px:
+            out += "<b>Match Rate by Threshold</b><br>" + VerifyStep._rows_table([
+                (f"Within {th:.0f} px", f"{rate * 100:.1f} %")
+                for th, rate in sorted(result.match_rate_by_threshold_px.items())
+            ])
+        out += (
+            "<b>Signed Offset</b> <span style='color:palette(mid)'>(matched only -- sign shows bias direction, "
+            "not just magnitude)</span><br>"
+            + VerifyStep._rows_table([
+                ("Δu Mean", px(result.mean_delta_u_px, signed=True)),
+                ("Δu Median", px(result.median_delta_u_px, signed=True)),
+                ("Δv Mean", px(result.mean_delta_v_px, signed=True)),
+                ("Δv Median", px(result.median_delta_v_px, signed=True)),
+            ])
+        )
+        return out
+
     def _display_edge_alignment(self, result: "ea.EdgeAlignmentResult"):
         self._eval_result = result
         if not result.ok:
@@ -1875,15 +3795,7 @@ class VerifyStep(StepPage):
             self.eval_depth_label.setText("—")
             return
 
-        self.eval_edge_label.setText(self._rows_table([
-            ("Mean", f"{result.mean_px:.2f} px"),
-            ("Median", f"{result.median_px:.2f} px"),
-            ("P95", f"{result.p95_px:.2f} px"),
-            ("Max", f"{result.max_px:.2f} px"),
-            ("Match Rate", f"{result.match_rate * 100:.1f} %"),
-            ("Edge Points", f"{result.n_edge_points:,}"),
-            ("Matched / Unmatched", f"{result.n_matched:,} / {result.n_unmatched:,}"),
-        ]))
+        self.eval_edge_label.setText(self._edge_alignment_summary_html(result))
 
         h, w = self._eval_frame_shape
         spatial = sa.analyze_spatial(result, w, h)
@@ -1914,7 +3826,14 @@ class VerifyStep(StepPage):
             self.window().statusBar().showMessage("bag 이 아직 로드되지 않았습니다.", 4000)
             return
 
-        n_samples = min(self.mf_count_spin.value(), len(self._times))
+        eval_times = list(self._times)
+        if self.board_motion_stable_only_check.isChecked():
+            if not self._board_motion_stable_lidar_times:
+                self.window().statusBar().showMessage("Run Board Motion Analysis first; no stable frames are available.", 5000)
+                return
+            eval_times = list(self._board_motion_stable_lidar_times)
+
+        n_samples = min(self.mf_count_spin.value(), len(eval_times))
         self._mf_gen += 1
         self.mf_run_btn.setEnabled(False)
         self.mf_cancel_btn.setVisible(True)
@@ -1928,7 +3847,7 @@ class VerifyStep(StepPage):
         p = self.project
         self.request_multiframe.emit(
             self._mf_gen, self._current_bag(), p.lidar_topic, p.camera_topic,
-            p.camera, sol, list(self._times), n_samples,
+            p.camera, sol, eval_times, n_samples,
             self.eval_min_range_spin.value(), self.eval_max_range_spin.value(),
             float(self.max_sync_spin.value()),
         )
@@ -1977,28 +3896,52 @@ class VerifyStep(StepPage):
             self.mf_worst_table.setRowCount(0)
             return
 
-        self.mf_summary_label.setText(self._rows_table([
-            ("Frames", f"{result.n_total}"),
-            ("Valid", f"{result.n_valid}"),
-            ("Failed", f"{result.n_failed}"),
-            ("Outlier", f"{result.n_outlier}"),
-            ("Sync Rejected", f"{result.n_sync_rejected}"),
-            ("Mean", f"{result.mean_px:.2f} px"),
-            ("Median", f"{result.median_px:.2f} px"),
-            ("STD", f"{result.std_px:.2f} px"),
-            ("P95", f"{result.p95_px:.2f} px"),
-            ("Max", f"{result.max_px:.2f} px"),
-            ("MAD", f"{result.mad_px:.2f} px"),
-            ("IQR", f"{result.iqr_px:.2f} px"),
-            ("Valid Ratio", f"{result.valid_ratio * 100:.1f} %"),
-            ("Failure Ratio", f"{result.failure_ratio * 100:.1f} %"),
-            ("Outlier Ratio", f"{result.outlier_ratio * 100:.1f} %"),
-            ("Sync Rejected Ratio", f"{result.sync_rejected_ratio * 100:.1f} %"),
-            ("Median Sync Offset (abs)", self._ms_text(result.sync_offset_median_ms)),
-            ("P95 Sync Offset (abs)", self._ms_text(result.sync_offset_p95_ms)),
-            ("Max Sync Offset (abs)", self._ms_text(result.sync_offset_max_ms)),
-            ("Signed Sync Median", self._signed_ms_text(result.sync_offset_signed_median_ms)),
-        ]))
+        px = self._px_or_dash
+        self.mf_summary_label.setText(
+            self._rows_table([
+                ("Frames", f"{result.n_total}"),
+                ("Valid", f"{result.n_valid}"),
+                ("Failed", f"{result.n_failed}"),
+                ("Outlier", f"{result.n_outlier}"),
+                ("Sync Rejected", f"{result.n_sync_rejected}"),
+            ])
+            + "<b>Penalty-inclusive</b> "
+            "<span style='color:palette(mid)'>(per-frame mean, unmatched points at the search-radius penalty)</span><br>"
+            + self._rows_table([
+                ("Mean", f"{result.mean_px:.2f} px"),
+                ("Median", f"{result.median_px:.2f} px"),
+                ("STD", f"{result.std_px:.2f} px"),
+                ("P95", f"{result.p95_px:.2f} px"),
+                ("Max", f"{result.max_px:.2f} px"),
+                ("MAD", f"{result.mad_px:.2f} px"),
+                ("IQR", f"{result.iqr_px:.2f} px"),
+            ])
+            + "<b>Matched-only</b> <span style='color:palette(mid)'>(per-frame matched mean, across valid frames)</span><br>"
+            + self._rows_table([
+                ("Mean", px(result.matched_mean_px)),
+                ("Median", px(result.matched_median_px)),
+                ("STD", px(result.matched_std_px)),
+                ("P95", px(result.matched_p95_px)),
+                ("Max", px(result.matched_max_px)),
+            ])
+            + "<b>Match Rate</b> <span style='color:palette(mid)'>(per-frame, across valid frames)</span><br>"
+            + self._rows_table([
+                ("Mean Match Rate", f"{result.match_rate_mean * 100:.1f} %" if np.isfinite(result.match_rate_mean) else "—"),
+                ("Median Match Rate", f"{result.match_rate_median * 100:.1f} %" if np.isfinite(result.match_rate_median) else "—"),
+                ("Min Match Rate", f"{result.match_rate_min * 100:.1f} %" if np.isfinite(result.match_rate_min) else "—"),
+                ("P5 Match Rate", f"{result.match_rate_p5 * 100:.1f} %" if np.isfinite(result.match_rate_p5) else "—"),
+            ])
+            + self._rows_table([
+                ("Valid Ratio", f"{result.valid_ratio * 100:.1f} %"),
+                ("Failure Ratio", f"{result.failure_ratio * 100:.1f} %"),
+                ("Outlier Ratio", f"{result.outlier_ratio * 100:.1f} %"),
+                ("Sync Rejected Ratio", f"{result.sync_rejected_ratio * 100:.1f} %"),
+                ("Median Sync Offset (abs)", self._ms_text(result.sync_offset_median_ms)),
+                ("P95 Sync Offset (abs)", self._ms_text(result.sync_offset_p95_ms)),
+                ("Max Sync Offset (abs)", self._ms_text(result.sync_offset_max_ms)),
+                ("Signed Sync Median", self._signed_ms_text(result.sync_offset_signed_median_ms)),
+            ])
+        )
 
         self.mf_worst_table.setRowCount(len(result.worst_frames))
         for r, f in enumerate(result.worst_frames):
@@ -2011,8 +3954,8 @@ class VerifyStep(StepPage):
             # is what guarantees the jump shows the same Camera/LiDAR pair the
             # Multi-frame run scored -- see pick_camera_for_frame's docstring.
             btn.clicked.connect(
-                lambda _checked=False, idx=f.timeline_index, cam_t=f.camera_timestamp_ns:
-                    self._goto_timeline_index(idx, cam_t)
+                lambda _checked=False, idx=f.timeline_index, cam_t=f.camera_timestamp_ns, lid_t=f.lidar_timestamp_ns:
+                    self._goto_timeline_index(idx, cam_t, lid_t)
             )
             self.mf_worst_table.setCellWidget(r, 4, btn)
         self.mf_worst_table.resizeColumnsToContents()
@@ -2025,7 +3968,8 @@ class VerifyStep(StepPage):
     def _signed_ms_text(value_ms: float) -> str:
         return f"{value_ms:+.1f} ms" if np.isfinite(value_ms) else "—"
 
-    def _goto_timeline_index(self, idx: int, camera_t_ns: "int | None" = None):
+    def _goto_timeline_index(self, idx: int, camera_t_ns: "int | None" = None,
+                             lidar_t_ns: "int | None" = None):
         """Where a Worst-Frame row's "이동" button lands: reuse the same
         slider -> debounce -> _request path a manual drag already takes.
 
@@ -2035,7 +3979,11 @@ class VerifyStep(StepPage):
         LiDAR moment with `first_after` instead, which is not necessarily the
         same image Multi-frame used (it pairs by nearest timestamp).
         """
-        if not self._times or not (0 <= idx < len(self._times)):
+        if not self._times:
+            return
+        if lidar_t_ns is not None:
+            idx = min(range(len(self._times)), key=lambda i: abs(self._times[i] - lidar_t_ns))
+        if not (0 <= idx < len(self._times)):
             return
         self.side_tabs.setCurrentIndex(0)
         self._pinned_camera_t_ns = camera_t_ns
@@ -2080,6 +4028,9 @@ class VerifyStep(StepPage):
         self._pert_result = None
         self._pert_T = (sol.R.copy(), sol.t.copy())
         self._pert_sync_limit_ms = float(self.max_sync_spin.value())
+        self._pert_search_source = "quick" if self.pert_search_quick_radio.isChecked() else "full"
+        self._pert_discovery_bag = self._current_bag()
+        self._pert_discovery_timestamps = self._discovery_frame_timestamps(mode)
 
         rotation_deltas, translation_deltas = self._pert_search_deltas()
         p = self.project
@@ -2090,6 +4041,54 @@ class VerifyStep(StepPage):
             self.eval_min_range_spin.value(), self.eval_max_range_spin.value(),
             float(self.max_sync_spin.value()), self._image, self._cloud,
         )
+
+    def _note_discovery_success(self):
+        """A Perturbation Grid or Fine Scan run has just *successfully*
+        produced a result -- not merely been launched (see
+        `_on_pert_ready`/`_on_fine_ready`, the only two call sites, each
+        already checked their result is neither cancelled nor empty before
+        calling this). Bumps the project-persistent `discovery_revision`
+        counter (see gui.core.evaluation.holdout.CandidateProvenance's
+        docstring) that any existing hold-out result's locked-in revision is
+        compared against (see `_holdout_status`), writes the new value
+        through to `self.project.validation_history` immediately
+        (`_persist_validation_history`), and refreshes that result's own
+        display immediately so a validation status shown on screen never
+        silently goes stale after the moment it changes."""
+        self._discovery_revision += 1
+        self._persist_validation_history()
+        if self._holdout_result is not None:
+            self._display_holdout(self._holdout_result)
+
+    def _persist_validation_history(self):
+        """Write-through + autosave signal, shared by both kinds of
+        validation provenance this page tracks: a Hold-out reveal
+        (`_on_holdout_ready`) and a successful Discovery run
+        (`_note_discovery_success`). `self.project.validation_history` (in
+        memory) is updated immediately either way, and
+        `validation_history_changed` asks MainWindow to patch just that key
+        to disk (see `Project.patch_validation_history`) -- never a full
+        project save, so an unrelated unsaved edit elsewhere in the project
+        is never silently promoted to "saved" by this."""
+        self.project.validation_history = ho.serialize_exposure_registry(
+            self._holdout_exposure_registry, self._discovery_revision,
+        )
+        self.validation_history_changed.emit()
+
+    def _discovery_frame_timestamps(self, mode: str) -> frozenset:
+        """Which lidar timestamps a Perturbation/Fine Scan run is about to
+        score, captured before the request is even sent -- `sample_frame_indices`
+        is a deterministic function of `len(self._times)` alone, so this needs
+        no bag I/O. Used only later, to let a Hold-out run check contamination
+        (see gui.core.evaluation.holdout.check_overlap); never influences what
+        the Discovery run itself scores.
+        """
+        if not self._times:
+            return frozenset()
+        if mode == "current_frame":
+            return frozenset({self._times[self.slider.value()]})
+        indices = mc.sample_frame_indices(len(self._times), self.pert_frames_spin.value())
+        return frozenset(self._times[i] for i in indices)
 
     def _pert_search_deltas(self) -> "tuple[tuple, tuple]":
         if self.pert_search_quick_radio.isChecked():
@@ -2123,6 +4122,9 @@ class VerifyStep(StepPage):
         self.pert_cancel_btn.setVisible(False)
         self._pert_result = result
         self._display_perturbation(result)
+        self._refresh_holdout_candidate_deltas()  # new tested deltas may now be available to lock
+        if not result.cancelled and result.axes:
+            self._note_discovery_success()
 
     def _on_pert_failed(self, gen: int, msg: str):
         if gen != self._pert_gen:
@@ -2171,8 +4173,20 @@ class VerifyStep(StepPage):
 
     @staticmethod
     def _perturbation_table_html(axis: "pert.AxisSensitivity") -> str:
+        """`Mean` is Penalty-inclusive (unchanged, pooled over every usable
+        frame's edge points -- see edge_alignment.EdgeAlignmentResult's
+        docstring), `Matched Mean` is the matched-only equivalent, and
+        `Match` is the fraction they should always be read alongside: a
+        delta whose Matched Mean looks great on a collapsing Match Rate is
+        describing a shrinking, possibly biased subset of points, not "the
+        rest were fine". Median/P95/ΔP95/Match were already here and are
+        unchanged.
+        """
         unit = "°" if axis.unit == "deg" else "mm"
-        header = "".join(f"<th style='text-align:right;padding:0 6px'>{h}</th>" for h in ("Δ", "Median", "P95", "ΔP95", "Match"))
+        header = "".join(
+            f"<th style='text-align:right;padding:0 6px'>{h}</th>"
+            for h in ("Δ", "Mean", "Matched Mean", "Median", "P95", "ΔP95", "Match")
+        )
         rows = [f"<tr>{header}</tr>"]
         for p in axis.points:
             weight = "font-weight:bold;" if p.delta == 0.0 else ""
@@ -2180,13 +4194,16 @@ class VerifyStep(StepPage):
             if not p.ok:
                 rows.append(
                     f"<tr style='{weight}'><td>{delta_text}</td>"
-                    f"<td colspan='4' style='color:#d9534f'>{p.reason or '평가 실패'}</td></tr>"
+                    f"<td colspan='6' style='color:#d9534f'>{p.reason or '평가 실패'}</td></tr>"
                 )
                 continue
             dp95 = f"{p.delta_p95_px:+.2f}" if np.isfinite(p.delta_p95_px) else "—"
+            matched_mean = f"{p.matched_mean_px:.2f}" if np.isfinite(p.matched_mean_px) else "—"
             rows.append(
                 f"<tr style='{weight}'>"
                 f"<td>{delta_text}</td>"
+                f"<td align='right'>{p.mean_px:.2f}</td>"
+                f"<td align='right'>{matched_mean}</td>"
                 f"<td align='right'>{p.median_px:.2f}</td>"
                 f"<td align='right'>{p.p95_px:.2f}</td>"
                 f"<td align='right'>{dp95}</td>"
@@ -2359,6 +4376,8 @@ class VerifyStep(StepPage):
         self._fine_result = None
         self._fine_T = (sol.R.copy(), sol.t.copy())
         self._fine_mode = mode
+        self._fine_discovery_bag = self._current_bag()
+        self._fine_discovery_timestamps = self._discovery_frame_timestamps(mode)
 
         p = self.project
         self.request_fine_scan.emit(
@@ -2385,6 +4404,9 @@ class VerifyStep(StepPage):
         self.fine_cancel_btn.setVisible(False)
         self._fine_result = axis
         self._display_fine_scan(axis)
+        self._refresh_holdout_candidate_deltas()  # new tested deltas may now be available to lock
+        if axis.baseline is not None:
+            self._note_discovery_success()
 
     def _on_fine_failed(self, gen: int, msg: str):
         if gen != self._fine_gen:
@@ -2408,6 +4430,587 @@ class VerifyStep(StepPage):
         self.fine_frame_table_label.setText(self._perturbation_frame_table_html(axis))
         self.fine_summary_label.setText(self._perturbation_summary_html(axis))
         self.fine_spatial_label.setText(self._perturbation_spatial_html(axis))
+
+    # ------------------------------------------------------ independent hold-out validation
+    #
+    # See gui.core.evaluation.holdout's module docstring for the one rule
+    # this whole section exists to enforce: hold-out data is never used to
+    # fit T or to search for a candidate. A candidate is only ever read off
+    # an already-finished Perturbation/Fine Scan result above, frozen into
+    # the request the moment "Hold-out 평가 실행" is pressed, and never
+    # written back to self._sol, the project, or a file.
+
+    def _on_holdout_source_changed(self):
+        is_bag = self.holdout_source_bag_radio.isChecked()
+        self.holdout_bag_combo.setEnabled(is_bag)
+        self.holdout_bag_status_label.setVisible(is_bag)
+        self.holdout_range_start_spin.setEnabled(not is_bag)
+        self.holdout_range_end_spin.setEnabled(not is_bag)
+        self.holdout_range_note.setVisible(not is_bag)
+        self._update_holdout_run_enabled()
+        self._update_holdout_preview()
+
+    def _update_holdout_run_enabled(self):
+        """Whether "Hold-out 평가 실행" has anything to run against -- kept as
+        its own step (rather than set inline wherever a bag finishes loading)
+        because it depends on which source radio is active *and* on
+        different state for each: a separate bag needs its own timeline
+        fetched, while "Current Bag Time Range" only needs the main view's
+        timeline, which may already be loaded before this section is even
+        touched."""
+        if self.holdout_source_bag_radio.isChecked():
+            self.holdout_run_btn.setEnabled(bool(self._holdout_bag_path) and bool(self._holdout_times))
+        else:
+            self.holdout_run_btn.setEnabled(bool(self._times))
+
+    def _on_holdout_bag_combo_changed(self):
+        path = self.holdout_bag_combo.currentData()
+        if path is None:  # "찾아보기…"
+            start = str(Path(self.project.bag_path).parent) if self.project.bag_path else ""
+            picked, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Hold-out Bag 선택", start, "ROS bag (*.bag)")
+            if not picked:
+                if self.holdout_bag_combo.count() > 1:
+                    self.holdout_bag_combo.blockSignals(True)
+                    self.holdout_bag_combo.setCurrentIndex(0)
+                    self.holdout_bag_combo.blockSignals(False)
+                return
+            self.holdout_bag_combo.blockSignals(True)
+            self.holdout_bag_combo.insertItem(self.holdout_bag_combo.count() - 1, Path(picked).name, picked)
+            self.holdout_bag_combo.setCurrentIndex(self.holdout_bag_combo.count() - 2)
+            self.holdout_bag_combo.blockSignals(False)
+            path = picked
+        self._open_holdout_bag(path)
+
+    def _open_holdout_bag(self, path: str):
+        self._holdout_bag_path = path
+        self._holdout_times = []
+        self._update_holdout_run_enabled()
+        self.holdout_bag_status_label.setText("여는 중…")
+        self._holdout_bag_gen += 1
+        self.request_holdout_open.emit(self._holdout_bag_gen, path, self.project.lidar_topic)
+
+    def _on_holdout_bag_progress(self, gen: int, done: int, total: int):
+        if gen != self._holdout_bag_gen:
+            return
+        self.holdout_bag_status_label.setText(f"여는 중… {done} / {total}")
+
+    def _on_holdout_bag_ready(self, gen: int, times: list):
+        if gen != self._holdout_bag_gen:
+            return
+        self._holdout_times = list(times)
+        name = Path(self._holdout_bag_path).name if self._holdout_bag_path else "—"
+        self.holdout_bag_status_label.setText(f"{name}  ({len(self._holdout_times)} frames)")
+        self._update_holdout_run_enabled()
+        self._update_holdout_preview()
+
+    def _on_holdout_bag_failed(self, gen: int, msg: str):
+        if gen != self._holdout_bag_gen:
+            return
+        self._holdout_times = []
+        self._update_holdout_run_enabled()
+        self.holdout_bag_status_label.setText(f"<span style='color:#d9534f'>{msg}</span>")
+
+    def _update_holdout_range_bounds(self):
+        """Keep the "Current Bag Time Range" spinboxes inside the bag
+        actually loaded in the main view -- called whenever that timeline
+        changes, not only while the hold-out section happens to be visible,
+        so a stale range is never silently carried into a different bag."""
+        if not self._times:
+            self.holdout_range_note.setText("")
+            self._update_holdout_run_enabled()
+            return
+        duration_s = (self._times[-1] - self._times[0]) / 1e9
+        self.holdout_range_start_spin.setRange(0.0, duration_s)
+        self.holdout_range_end_spin.setRange(0.0, duration_s)
+        if self.holdout_range_end_spin.value() <= self.holdout_range_start_spin.value():
+            self.holdout_range_end_spin.setValue(duration_s)
+        self.holdout_range_note.setText(f"현재 bag 길이: {duration_s:.1f}s")
+        self._update_holdout_run_enabled()
+        self._update_holdout_preview()
+
+    def _refresh_holdout_candidate_deltas(self):
+        """Every non-zero, successfully-evaluated delta the selected
+        Discovery source (Perturbation Grid or Fine Scan) actually tested for
+        the axis currently selected in `pert_axis_combo` -- a hold-out
+        candidate can only ever be one of these, never a typed-in value, so
+        it is always traceable back to a real Discovery result."""
+        axis_key = self.pert_axis_combo.currentData()
+        self.holdout_delta_combo.blockSignals(True)
+        self.holdout_delta_combo.clear()
+        src = self.holdout_candidate_source_combo.currentData()
+        axis_result = None
+        if src == "fine" and self._fine_result is not None and self._fine_result.axis == axis_key:
+            axis_result = self._fine_result
+        elif src == "grid" and self._pert_result is not None and axis_key is not None:
+            axis_result = self._pert_result.axes.get(axis_key)
+        if axis_result is not None:
+            unit = "°" if axis_result.unit == "deg" else " mm"
+            for point in axis_result.points:
+                if point.delta == 0.0 or not point.ok:
+                    continue
+                self.holdout_delta_combo.addItem(f"{point.delta:+.3f}{unit}", point.delta)
+        self.holdout_delta_combo.blockSignals(False)
+        self._update_holdout_preview()
+
+    def _update_holdout_preview(self):
+        axis_key = self.pert_axis_combo.currentData()
+        delta = self.holdout_delta_combo.currentData()
+        src = self.holdout_candidate_source_combo.currentData()
+        if axis_key is None or delta is None:
+            self.holdout_candidate_label.setText(
+                "<span style='color:palette(mid)'>Perturbation Sensitivity 또는 Fine Scan을 먼저 실행하세요.</span>"
+            )
+            self.holdout_overlap_label.setText("")
+            return
+        unit = "°" if axis_key in pert.ROTATION_AXES else " mm"
+        self.holdout_candidate_label.setText(
+            f"Axis: <b>{pert.AXIS_LABELS[axis_key]}</b><br>"
+            f"Delta: <b>{delta:+.3f}{unit}</b><br>"
+            f"Source: <b>{'Fine Scan' if src == 'fine' else 'Perturbation Grid'}</b>"
+        )
+        self._refresh_holdout_overlap_warning()
+
+    def _holdout_plan(self):
+        """(bag_path, times, error) for the currently configured hold-out
+        source; `error` is None exactly when the other two are usable.
+
+        Pure UI-thread bookkeeping -- no bag is read here. "Separate Bag"'s
+        `times` were already fetched by `_on_holdout_bag_ready`; "Current Bag
+        Time Range"'s is a sub-list of `self._times`, already held in memory.
+        """
+        if self.holdout_source_bag_radio.isChecked():
+            if not self._holdout_bag_path:
+                return None, None, "Hold-out bag을 선택하세요."
+            if not self._holdout_times:
+                return None, None, "Hold-out bag을 여는 중입니다…"
+            return self._holdout_bag_path, list(self._holdout_times), None
+
+        if not self._times:
+            return None, None, "현재 bag이 아직 로드되지 않았습니다."
+        base = self._times[0]
+        start_ns = base + int(round(self.holdout_range_start_spin.value() * 1e9))
+        end_ns = base + int(round(self.holdout_range_end_spin.value() * 1e9))
+        if end_ns <= start_ns:
+            return None, None, "Hold-out End가 Start보다 뒤여야 합니다."
+        sub = [t for t in self._times if start_ns <= t <= end_ns]
+        if not sub:
+            return None, None, "선택한 시간 구간에 frame이 없습니다."
+        return self._current_bag(), sub, None
+
+    def _holdout_discovery(self):
+        """(bag, timestamps) of whichever Discovery run -- Perturbation Grid
+        or Fine Scan -- the currently selected candidate source refers to;
+        what `holdout.check_overlap`/`partition_independent_frames` compares
+        the hold-out frame set against."""
+        if self.holdout_candidate_source_combo.currentData() == "fine":
+            return self._fine_discovery_bag, self._fine_discovery_timestamps
+        return self._pert_discovery_bag, self._pert_discovery_timestamps
+
+    def _holdout_sample(self, times: list):
+        """The exact hold-out frame timestamps a run would sample from
+        `times`, *before* Discovery-exclusion filtering -- the same
+        deterministic `sample_frame_indices` every other frame-sampling path
+        in this module uses, computed here purely to preview/check
+        independence before anything is actually read from a bag."""
+        n_frames = min(self.holdout_frames_spin.value(), len(times))
+        indices = mc.sample_frame_indices(len(times), n_frames)
+        return n_frames, [times[i] for i in indices]
+
+    def _holdout_independence_partition(self):
+        """(bag, partition, error) -- `partition` is a
+        `holdout.IndependencePartition` splitting the sampled hold-out frames
+        into usable / excluded-near-Discovery, per the configured Discovery
+        Exclusion Margin. `error` is None exactly when `bag`/`partition` are
+        usable; still returned even when `partition.n_usable == 0`, so a
+        caller can show *why* before refusing to run.
+        """
+        bag, times, error = self._holdout_plan()
+        if error:
+            return None, None, error
+        _, sampled = self._holdout_sample(times)
+        disc_bag, disc_ts = self._holdout_discovery()
+        margin_s = self.holdout_margin_spin.value()
+        partition = ho.partition_independent_frames(sampled, disc_bag or "", disc_ts, bag, margin_s)
+        return bag, partition, None
+
+    def _refresh_holdout_overlap_warning(self):
+        bag, partition, error = self._holdout_independence_partition()
+        if error:
+            self.holdout_overlap_label.setText(f"<span style='color:palette(mid)'>{error}</span>")
+            return
+        disc_bag, _ = self._holdout_discovery()
+        lines = [f"Requested: {partition.requested}   Excluded near Discovery: {partition.n_excluded}   "
+                 f"Usable: {partition.n_usable}"]
+        if partition.n_usable == 0:
+            lines.append(
+                "<b>Hold-out overlaps with discovery data. Independent validation is not valid.</b>"
+            )
+            self.holdout_overlap_label.setText(f"<span style='color:#d9534f'>{'<br>'.join(lines)}</span>")
+            return
+        if not disc_bag:
+            lines.append("Discovery 결과가 없습니다 — Perturbation/Fine Scan을 먼저 실행하세요.")
+        elif partition.independence_limited:
+            lines.append(
+                f"<b>Independence limited</b> -- fewer than {ho.DEFAULT_MIN_INDEPENDENT_FRAMES} independent "
+                "frames available; read a result from this configuration cautiously."
+            )
+        self.holdout_overlap_label.setText(f"<span style='color:palette(mid)'>{'<br>'.join(lines)}</span>")
+
+    def _run_holdout(self):
+        sol = self._effective()
+        if sol is None or not sol.ok:
+            self.window().statusBar().showMessage(
+                "6단계 계산 또는 extrinsic 불러오기가 먼저 필요합니다.", 5000
+            )
+            return
+
+        axis_key = self.pert_axis_combo.currentData()
+        delta = self.holdout_delta_combo.currentData()
+        src = self.holdout_candidate_source_combo.currentData()
+        if axis_key is None or delta is None:
+            self.window().statusBar().showMessage(
+                "Candidate가 없습니다. Perturbation Sensitivity 또는 Fine Scan을 먼저 실행하세요.", 5000
+            )
+            return
+
+        # The candidate must have been discovered against the extrinsic shown
+        # now -- otherwise Baseline (current T) and Candidate (baseline+delta
+        # read off a stale discovery run) would not describe the same T_original.
+        discovery_T = self._fine_T if src == "fine" else self._pert_T
+        if discovery_T is None or not dg.extrinsic_matches(discovery_T[0], discovery_T[1], sol.R, sol.t):
+            self.window().statusBar().showMessage(
+                "선택한 Discovery 결과가 현재 extrinsic과 다릅니다. Perturbation/Fine Scan을 다시 실행하세요.", 6000
+            )
+            return
+
+        bag, partition, error = self._holdout_independence_partition()
+        if error:
+            self.window().statusBar().showMessage(error, 5000)
+            return
+        if partition.n_usable == 0:
+            self.window().statusBar().showMessage(
+                "Hold-out overlaps with discovery data. Independent validation is not valid.", 8000
+            )
+            return
+
+        source_label = self._pert_search_source if src == "grid" else "fine"
+        disc_bag, disc_ts = self._holdout_discovery()
+
+        self._holdout_gen += 1
+        self.holdout_run_btn.setEnabled(False)
+        self.holdout_cancel_btn.setVisible(True)
+        self.holdout_progress_label.setText("Hold-out 프레임 준비 중…")
+        self.holdout_status_label.setText("")
+        self.holdout_summary_label.setText("—")
+        self.holdout_spatial_label.setText("—")
+        self.holdout_depth_label.setText("—")
+        self.ab_export_btn.setEnabled(False)
+        self._holdout_result = None
+        # Locked here, at the moment Run is pressed: axis/delta/source and
+        # the baseline T they are compared against are frozen into this call
+        # and never re-read from the UI afterward -- see "Candidate lock" in
+        # the module docstring. Changing the combos above after this point
+        # can only affect the *next* run, never the one now in flight.
+        self._holdout_T = (sol.R.copy(), sol.t.copy())
+        self._holdout_locked_discovery_revision = self._discovery_revision
+
+        p = self.project
+        req = _HoldoutRequest(
+            gen=self._holdout_gen, bag=bag, lidar_topic=p.lidar_topic, camera_topic=p.camera_topic, camera=p.camera,
+            baseline_R=sol.R.copy(), baseline_t=sol.t.copy(), axis=axis_key, delta=float(delta),
+            source_label=source_label, times=list(partition.usable_timestamps),
+            min_range=self.eval_min_range_spin.value(), max_range=self.eval_max_range_spin.value(),
+            max_sync_offset_ms=float(self.max_sync_spin.value()),
+            discovery_bag=disc_bag or "", discovery_timestamps=tuple(disc_ts),
+            exclusion_margin_s=self.holdout_margin_spin.value(),
+            # usable + excluded reconstructs exactly what was sampled before
+            # exclusion filtering (see IndependencePartition: every sampled
+            # timestamp ends up in exactly one of the two).
+            requested_timestamps=partition.usable_timestamps + partition.excluded_timestamps,
+            excluded_near_discovery=partition.excluded_timestamps,
+            bootstrap_iterations=self.holdout_bootstrap_iter_spin.value(),
+            bootstrap_block_s=self.holdout_bootstrap_block_spin.value(),
+            discovery_revision=self._discovery_revision,
+        )
+        self.request_holdout.emit(req)
+
+    def _cancel_holdout(self):
+        self._worker.cancel_holdout()
+        self.holdout_progress_label.setText(self.holdout_progress_label.text() + "  (취소 중…)")
+
+    def _on_holdout_progress(self, gen: int, phase: str, done: int, total: int):
+        if gen != self._holdout_gen:
+            return
+        label = "프레임 준비" if phase == "prepare" else "평가"
+        self.holdout_progress_label.setText(f"{label} 중 {done} / {total}")
+
+    def _on_holdout_ready(self, gen: int, result: "ho.HoldoutResult"):
+        if gen != self._holdout_gen:
+            return
+        self.holdout_run_btn.setEnabled(True)
+        self.holdout_cancel_btn.setVisible(False)
+        self._holdout_result = result
+        # Exposure is recorded here -- the moment a *successful, uncancelled*
+        # result is actually about to be shown to a person -- never merely
+        # because the worker finished computing. A cancelled or failed run
+        # revealed nothing (see holdout.record_exposure's docstring).
+        if result.ok and not result.cancelled and result.provenance is not None and result.provenance.bag \
+                and result.candidate_identity is not None and result.candidate_provenance is not None:
+            # The guard band in effect *for this run* (see result.discovery),
+            # not necessarily whatever the spinbox shows by the time the
+            # result arrives -- reused as the Hold-out reveal margin too
+            # (see gui.core.evaluation.holdout.determine_and_record_exposure's
+            # docstring for why this is a distinct, if numerically copied,
+            # setting from Discovery Exclusion Margin).
+            reveal_margin_s = result.discovery.exclusion_margin_s if result.discovery is not None \
+                else self.holdout_margin_spin.value()
+            self._holdout_reveal_status = ho.determine_and_record_exposure(
+                self._holdout_exposure_registry, result.provenance.bag, result.signature,
+                result.provenance.usable_timestamps, result.candidate_identity, result.candidate_provenance,
+                reveal_margin_s,
+            )
+            # Reflected into the Project object immediately, in memory, and
+            # patched to disk right away -- validation exposure history is
+            # provenance, not an ordinary UI setting a person might casually
+            # discard -- unlike scenes/filters/etc. (only written to disk on
+            # an explicit "저장…"). See `_persist_validation_history`: it
+            # patches ONLY the validation_history key on disk (see
+            # `Project.patch_validation_history`), never a full project
+            # save, and is a no-op until this project has been saved at
+            # least once (see `_refresh_holdout_persistence_note`).
+            self._persist_validation_history()
+        else:
+            self._holdout_reveal_status = ho.STATUS_INDEPENDENT
+        self._display_holdout(result)
+
+    def _on_holdout_failed(self, gen: int, msg: str):
+        if gen != self._holdout_gen:
+            return
+        self.holdout_run_btn.setEnabled(True)
+        self.holdout_cancel_btn.setVisible(False)
+        self.holdout_progress_label.setText("")
+        self.holdout_summary_label.setText(f"<span style='color:#d9534f'>{msg}</span>")
+        self.ab_export_btn.setEnabled(False)
+
+    def _holdout_status(self) -> str:
+        """Combines two independent exposure checks -- either alone is
+        enough to call this Exploratory:
+
+          (A) Live staleness: has Discovery moved on since *this* result's
+              candidate was locked? Checked fresh every call against the
+              project-persistent `discovery_revision` counter, so an
+              already-displayed Independent result correctly turns
+              Exploratory the moment Perturbation/Fine Scan next
+              *successfully* completes (see `_note_discovery_success`),
+              without needing to be re-shown -- and this comparison stays
+              correct across an app restart, since the counter is restored
+              from disk rather than reset to 0.
+          (B) Historical reuse: was this candidate the first one ever
+              revealed for this exact Hold-out dataset in this session?
+              Classified once, at the moment this result was first shown
+              (`_on_holdout_ready` -> `ho.determine_and_record_exposure`),
+              and frozen in `self._holdout_reveal_status` from then on --
+              catches candidate-switching on a dataset that was peeked at
+              before, which a Discovery-generation check alone cannot see.
+
+        `STATUS_INDEPENDENT` (not "no result yet") when there is no result at
+        all -- there is simply nothing to have been exposed.
+        """
+        if self._holdout_result is None:
+            return ho.STATUS_INDEPENDENT
+        if self._discovery_revision > self._holdout_locked_discovery_revision:
+            return ho.STATUS_EXPOSED_DISCOVERY_UPDATED
+        return self._holdout_reveal_status
+
+    def _display_holdout(self, result: "ho.HoldoutResult"):
+        self.holdout_progress_label.setText(f"완료 — {result.n_frames_used} / {result.n_frames_requested} frame")
+        status = self._holdout_status()
+        label = ho.STATUS_LABELS.get(status, status)
+        if status in ho.EXPOSED_STATUSES:
+            self.holdout_status_label.setText(f"<span style='color:#b26a00'><b>{label}</b></span>")
+        else:
+            self.holdout_status_label.setText(f"<span style='color:palette(mid)'>{label}</span>")
+
+        if result.cancelled or not result.ok:
+            color = "palette(mid)" if result.cancelled else "#d9534f"
+            self.holdout_summary_label.setText(f"<span style='color:{color}'>{result.reason}</span>")
+            self.holdout_spatial_label.setText("—")
+            self.holdout_depth_label.setText("—")
+            self.ab_export_btn.setEnabled(False)
+            return
+
+        self.holdout_summary_label.setText(self._holdout_summary_html(result))
+        self.holdout_spatial_label.setText(
+            "수평<br>" + self._holdout_compare_table_html([r for r in result.horizontal])
+            + "수직<br>" + self._holdout_compare_table_html([r for r in result.vertical])
+        )
+        self.holdout_depth_label.setText(self._holdout_compare_table_html(result.depth))
+        # Independent vs Exploratory is not a gate here -- see
+        # _export_ab_package/ab_export's own module docstring: Exploratory
+        # export is allowed, just clearly labelled, never blocked outright.
+        self.ab_export_btn.setEnabled(True)
+
+    @staticmethod
+    def _holdout_summary_html(result: "ho.HoldoutResult") -> str:
+        cand = result.candidate
+        baseline, candidate_point = result.baseline_point, result.candidate_point
+        bs = result.bootstrap
+        unit = "°" if cand.unit == "deg" else " mm"
+        rows = [
+            ("Candidate", f"{cand.label} {cand.delta:+.3f}{unit}  ({cand.source.capitalize()})"),
+        ]
+        if result.candidate_provenance is not None:
+            rows.append(("Discovery revision (locked)", str(result.candidate_provenance.discovery_revision)))
+        if result.provenance is not None:
+            rows.append(("Requested / Excluded near Discovery / Usable",
+                         f"{len(result.provenance.requested_timestamps)} / "
+                         f"{len(result.provenance.excluded_near_discovery)} / {result.n_frames_requested}"))
+        if result.discovery is not None:
+            rows.append(("Discovery Exclusion Margin", f"{result.discovery.exclusion_margin_s:.1f} sec"))
+        rows += [
+            ("Hold-out frames (usable / requested)", f"{result.n_frames_used} / {result.n_frames_requested}"),
+            ("Sync Rejected", str(result.n_sync_rejected)),
+            ("Baseline Median Frame-P95", f"{baseline.median_frame_p95_px:.2f} px"),
+            ("Candidate Median Frame-P95", f"{candidate_point.median_frame_p95_px:.2f} px"),
+            ("Median ΔFrame-P95", f"{candidate_point.median_delta_frame_p95_px:+.2f} px"
+                if np.isfinite(candidate_point.median_delta_frame_p95_px) else "—"),
+            ("P95 ΔFrame-P95", f"{candidate_point.p95_delta_frame_p95_px:+.2f} px"
+                if np.isfinite(candidate_point.p95_delta_frame_p95_px) else "—"),
+        ]
+        if bs is not None:
+            rows += [
+                ("Bootstrap method", "Non-overlapping Block Bootstrap"),
+                ("Comparable frames", str(bs.n_comparable_frames)),
+                ("Median Frame Interval", f"{bs.median_frame_interval_s:.2f} s"
+                    if np.isfinite(bs.median_frame_interval_s) else "—"),
+                ("Bootstrap Block Duration", f"{bs.block_s:.1f} s"),
+                ("Effective Temporal Blocks", str(bs.n_blocks)),
+            ]
+            if bs.n_blocks:
+                rows.append((
+                    "Frames / Block",
+                    f"median {bs.frames_per_block_median:.1f}, range {bs.frames_per_block_min}-{bs.frames_per_block_max}",
+                ))
+            if bs.sparse_sampling:
+                rows.append(("Sparse sampling", "Most bootstrap blocks contain only one evaluated frame. "
+                                                 "Temporal dependence may be weakly represented."))
+        if bs is not None and bs.ok:
+            rows.append((
+                "95% Block-Bootstrap CI (median ΔP95)",
+                f"[{bs.median_delta_ci_low_px:+.2f}, {bs.median_delta_ci_high_px:+.2f}] px "
+                f"({bs.iterations} iters)",
+            ))
+            rows.append((
+                "95% CI (Improved Ratio)",
+                f"[{bs.improved_ratio_ci_low * 100:.1f}, {bs.improved_ratio_ci_high * 100:.1f}] %",
+            ))
+            if bs.median_ci_excludes_zero is False:
+                rows.append(("CI interpretation", "The estimated improvement is uncertain (interval includes zero)."))
+        elif bs is not None:
+            rows.append(("95% Block-Bootstrap CI", bs.reason or "unavailable"))
+        rows += [
+            ("Improved", f"{candidate_point.n_improved_frames} / {candidate_point.n_comparable_frames}"),
+            ("Worsened", f"{candidate_point.n_worsened_frames} / {candidate_point.n_comparable_frames}"),
+            ("Unchanged", f"{candidate_point.n_unchanged_frames} / {candidate_point.n_comparable_frames}"),
+            ("Improved Ratio", f"{candidate_point.improved_frame_ratio * 100:.1f} %"
+                if np.isfinite(candidate_point.improved_frame_ratio) else "—"),
+            ("Comparable", f"{candidate_point.n_comparable_frames} / {baseline.n_valid_frames}"),
+        ]
+        if candidate_point.n_baseline_only_valid:
+            rows.append(("Baseline-only valid", str(candidate_point.n_baseline_only_valid)))
+        if candidate_point.n_candidate_only_valid:
+            rows.append(("Candidate-only valid", str(candidate_point.n_candidate_only_valid)))
+        if candidate_point.n_both_failed:
+            rows.append(("Both failed", str(candidate_point.n_both_failed)))
+        html_out = VerifyStep._rows_table(rows)
+        if result.signature_warning:
+            html_out += f"<div style='color:#d9534f'>{result.signature_warning}</div>"
+        if result.cross_bag_time_overlap_note:
+            html_out += f"<div style='color:palette(mid)'>{result.cross_bag_time_overlap_note}</div>"
+        return html_out
+
+    @staticmethod
+    def _holdout_compare_table_html(rows: list) -> str:
+        if not rows:
+            return "<span style='color:palette(mid)'>—</span>"
+        out = ["<table cellspacing='4'><tr><th></th><th>Baseline</th><th>Candidate</th><th>Δ</th></tr>"]
+        for r in rows:
+            if r.baseline_n_points == 0 and r.candidate_n_points == 0:
+                out.append(f"<tr><td>{r.label}</td><td colspan='3' style='color:palette(mid)'>—</td></tr>")
+                continue
+            delta_text = f"{r.delta_p95_px:+.2f}" if np.isfinite(r.delta_p95_px) else "—"
+            out.append(
+                f"<tr><td>{r.label}</td>"
+                f"<td align='right'>{r.baseline_p95_px:.2f} "
+                f"<span style='color:palette(mid)'>(n={r.baseline_n_points:,})</span></td>"
+                f"<td align='right'>{r.candidate_p95_px:.2f} "
+                f"<span style='color:palette(mid)'>(n={r.candidate_n_points:,})</span></td>"
+                f"<td align='right'>{delta_text}</td></tr>"
+            )
+        out.append("</table>")
+        return "".join(out)
+
+    # --------------------------------------------- candidate A/B test package export
+    #
+    # See gui.core.evaluation.ab_export's module docstring: this only ever
+    # repackages the Hold-out result already displayed above. The actual
+    # "is this still valid to export" checks (current extrinsic == locked
+    # baseline, recomputed candidate == locked candidate fingerprint) run
+    # inside ab_export.build_snapshot -- never duplicated or re-decided
+    # here, so there is exactly one place that decides it.
+
+    def _export_ab_package(self):
+        sol = self._effective()
+        if sol is None or not sol.ok:
+            self.window().statusBar().showMessage(
+                "6단계 계산 또는 extrinsic 불러오기가 먼저 필요합니다.", 5000
+            )
+            return
+        block_reason = self._symmetry_export_block_reason()
+        if block_reason:
+            self.ab_export_status_label.setText(f"<span style='color:#d9534f'>{html.escape(block_reason)}</span>")
+            self.window().statusBar().showMessage("Calibration export blocked by correspondence symmetry gate.", 7000)
+            return
+        if self._holdout_result is None or not self._holdout_result.ok or self._holdout_result.cancelled:
+            self.window().statusBar().showMessage("먼저 Hold-out 평가를 실행하세요.", 5000)
+            return
+
+        p = self.project
+        snap = abx.build_snapshot(
+            project_name=p.name, baseline_solution=sol, holdout=self._holdout_result,
+            validation_status=self._holdout_status(), camera=p.camera, target=p.target,
+            lidar_topic=p.lidar_topic, camera_topic=p.camera_topic, bag_paths=list(p.bag_paths),
+            method=self._method(),
+        )
+        if not snap.ok:
+            self.ab_export_status_label.setText(f"<span style='color:#d9534f'>{html.escape(snap.reason)}</span>")
+            return
+
+        RESULT_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            outcome = abx.export_package(snap, RESULT_DIR)
+        except Exception as exc:  # noqa: BLE001 - shown to the user, never crashes the app
+            self.ab_export_status_label.setText(
+                f"<span style='color:#d9534f'>{html.escape(f'{type(exc).__name__}: {exc}')}</span>"
+            )
+            return
+        if not outcome.ok:
+            self.ab_export_status_label.setText(f"<span style='color:#d9534f'>{html.escape(outcome.reason)}</span>")
+            return
+
+        self._last_ab_export_dir = outcome.out_dir
+        self.ab_export_open_btn.setEnabled(True)
+        self.ab_export_status_label.setText(
+            "<span style='color:palette(mid)'>A/B package exported<br>"
+            f"{html.escape(str(outcome.out_dir))}</span>"
+        )
+        self.window().statusBar().showMessage(f"A/B package exported: {outcome.out_dir.name}", 8000)
+
+    def _open_ab_export_folder(self):
+        path = self._last_ab_export_dir
+        if path is None:
+            return
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(path)))
 
     # ------------------------------------------------------ diagnostic evidence
     #
@@ -2433,6 +5036,11 @@ class VerifyStep(StepPage):
         mf_result = fresh(self._mf_result, self._mf_T, "Multi-frame evaluation")
         eval_result = fresh(self._eval_result, self._eval_T, "Current-frame evaluation")
         eval_spatial = self._eval_spatial if eval_result is not None else None
+        # Independent Hold-out Validation compares its own frozen baseline
+        # (self._holdout_T, captured when Run was pressed) against the T
+        # shown now -- a stale hold-out result describes a candidate that was
+        # locked against a T_original this page no longer shows.
+        holdout_result = fresh(self._holdout_result, self._holdout_T, "Hold-out validation")
 
         calibration = dg.CalibrationContext()
         step = self._calibrate_step()
@@ -2462,6 +5070,8 @@ class VerifyStep(StepPage):
             current_frame=eval_result,
             current_frame_spatial=eval_spatial,
             calibration=calibration,
+            holdout=holdout_result,
+            holdout_status=self._holdout_status(),
             notes=notes,
         )
 
@@ -2636,6 +5246,11 @@ class VerifyStep(StepPage):
         text = self.export_text.toPlainText()
         if not text:
             return
+        block_reason = self._symmetry_export_block_reason()
+        if block_reason:
+            QtWidgets.QMessageBox.warning(self, "Calibration ambiguous", block_reason)
+            self.window().statusBar().showMessage("Calibration export blocked by correspondence symmetry gate.", 7000)
+            return
         kind = self.export_combo.currentData()
         stem = self.project.name if self.project.name != "untitled" else "extrinsic"
         name = {"livo2": f"{stem}_fast_livo2.txt", "yaml": f"{stem}.yaml",
@@ -2663,6 +5278,10 @@ class VerifyStep(StepPage):
 
     def shutdown(self):
         self._worker.cancel_multiframe()  # let a long multi-frame run exit early rather than block close
+        self._worker.cancel_board_motion()
+        self._worker.cancel_timestamp_diagnostic()
+        self._worker.cancel_board_timestamp_diagnostic()
+        self._worker.cancel_holdout()
         self._worker.shutdown()
         self._thread.quit()
         self._thread.wait(1500)

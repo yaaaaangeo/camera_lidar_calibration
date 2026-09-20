@@ -1,0 +1,38 @@
+{
+  "boundary_point_count": 10,
+  "category": "circle_0",
+  "circle_count": 0,
+  "frame_index": 407,
+  "plane_likeness_current": {
+    "area_m2": 0.565599332243854,
+    "aspect_similarity": 0.8866917716748021,
+    "boundary_score": 0.16129032258064516,
+    "detector_ok": false,
+    "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+    "expected_height_m": 0.64,
+    "expected_width_m": 0.74,
+    "height_m": 0.6585896636382522,
+    "hole_candidates": 0,
+    "n": 62,
+    "size_similarity": 0.8373418655236511,
+    "width_m": 0.8588038401928584
+  },
+  "plane_likeness_previous": {
+    "area_m2": 0.565599332243854,
+    "aspect_similarity": 0.886691771674802,
+    "boundary_score": 0.16129032258064516,
+    "detector_ok": false,
+    "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+    "expected_height_m": 0.38016,
+    "expected_width_m": 0.43955999999999995,
+    "height_m": 0.6585896636382522,
+    "hole_candidates": 0,
+    "n": 62,
+    "size_similarity": 0.2954443544639029,
+    "width_m": 0.8588038401928584
+  },
+  "plane_point_count": 62,
+  "radii_m": [],
+  "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+  "roi_point_count": 305
+}

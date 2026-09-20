@@ -1,0 +1,75 @@
+{
+  "board_like": false,
+  "detector": {
+    "boundary_point_count": 136,
+    "circle_candidate_count": 6,
+    "circle_count": 6,
+    "ok": false,
+    "plane_point_count": 856,
+    "plane_rms": 0.005194860682231765,
+    "radii_m": [
+      0.11143965994464707,
+      0.1197635095693809,
+      0.14095806438080072,
+      0.14724635795837882,
+      0.1504052113386936,
+      0.14593846729827087
+    ],
+    "reason": "\uc6d0 6\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+  },
+  "hard_reject_reason": "",
+  "index": 1,
+  "plane_equation": {
+    "d": -17.075465075388443,
+    "normal": [
+      0.996627774078896,
+      0.08060705506891136,
+      0.015348700520319215
+    ]
+  },
+  "plane_point_count": 869,
+  "remaining_point_count": 1841,
+  "scores": {
+    "area_m2": 4.491007385963132,
+    "aspect_ratio": 1.2808584035894683,
+    "aspect_similarity": 0.902714926770776,
+    "boundary_count": 136,
+    "boundary_ratio": 0.1565017261219793,
+    "boundary_support": 1.0,
+    "centroid": [
+      17.905785465130734,
+      -9.31377659239072,
+      -1.2715888041895744
+    ],
+    "circle_candidate_count": 6,
+    "circle_count": 6,
+    "circle_support": 1.0,
+    "density_points_per_m2": 193.49778909651826,
+    "height_m": 1.8724978325213533,
+    "normal": [
+      0.996627774078896,
+      0.08060705506891136,
+      0.015348700520319215
+    ],
+    "plane_d": -17.075465075388443,
+    "plane_quality": 0.9690210146681241,
+    "plane_rms_m": 0.005321849521197417,
+    "point_count": 869,
+    "point_density": 0.5388312064106098,
+    "point_ratio": 0.4720260727865291,
+    "radii_m": [
+      0.11143965994464707,
+      0.1197635095693809,
+      0.14095806438080072,
+      0.14724635795837882,
+      0.1504052113386936,
+      0.14593846729827087
+    ],
+    "rectangularity": 0.8478746585138894,
+    "size_similarity": 0.3085384362530141,
+    "total_score": 0.7405082689638268,
+    "width_m": 2.3984045844880404
+  },
+  "total_roi_points": 1841,
+  "total_score": 0.7405082689638268
+}

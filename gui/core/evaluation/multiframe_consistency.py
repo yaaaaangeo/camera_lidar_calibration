@@ -106,11 +106,18 @@ class FrameEvalResult:
     offset_s: float
     ok: bool
     reason: str = ""
+    # Penalty-inclusive (this frame's own pooled edge points, unmatched ones
+    # at the largest search radius) -- unchanged; see
+    # edge_alignment.EdgeAlignmentResult's docstring for what that means.
     mean_px: float = float("nan")
     median_px: float = float("nan")
     p95_px: float = float("nan")
     n_edge_points: int = 0
     match_rate: float = float("nan")
+    # Matched-only, this same frame's points -- never includes the penalty
+    # value, so it and `mean_px` above must never be read as the same thing.
+    matched_mean_px: float = float("nan")
+    matched_median_px: float = float("nan")
     is_outlier: bool = False
     robust_z: float = float("nan")
     # 0 when no camera frame was found to pair against at all (a missing-data
@@ -140,6 +147,9 @@ class MultiFrameConsistencyResult:
     failure_ratio: float = float("nan")
     outlier_ratio: float = float("nan")
     sync_rejected_ratio: float = float("nan")
+    # Penalty-inclusive across valid frames' own (also penalty-inclusive)
+    # mean_px -- unchanged from before matched-only tracking existed. See
+    # FrameEvalResult / edge_alignment.EdgeAlignmentResult's docstrings.
     mean_px: float = float("nan")
     median_px: float = float("nan")
     std_px: float = float("nan")
@@ -147,6 +157,22 @@ class MultiFrameConsistencyResult:
     max_px: float = float("nan")
     mad_px: float = float("nan")
     iqr_px: float = float("nan")
+    # Matched-only, same valid frames' matched_mean_px -- never includes the
+    # unmatched penalty value at any stage (per-frame or here). Read
+    # alongside match_rate_mean/etc. below: a low match rate means these
+    # describe a shrinking, possibly biased subset of frames' points.
+    matched_mean_px: float = float("nan")
+    matched_median_px: float = float("nan")
+    matched_std_px: float = float("nan")
+    matched_p95_px: float = float("nan")
+    matched_max_px: float = float("nan")
+    # Per-frame match_rate, aggregated across valid frames -- p5/min flag a
+    # run where most frames match fine but a handful collapse, which a mean
+    # alone would hide.
+    match_rate_mean: float = float("nan")
+    match_rate_median: float = float("nan")
+    match_rate_min: float = float("nan")
+    match_rate_p5: float = float("nan")
     # Over every frame a camera image was actually found for (valid, failed-
     # for-other-reasons, and sync_rejected alike) -- a separate question from
     # the geometric error above, and reported even when nothing was rejected.
@@ -257,6 +283,8 @@ def evaluate_multiframe_consistency(
                         base.p95_px = result.p95_px
                         base.n_edge_points = result.n_edge_points
                         base.match_rate = result.match_rate
+                        base.matched_mean_px = result.matched_mean_px
+                        base.matched_median_px = result.matched_median_px
                         frame_results.append(base)
 
         if progress is not None:
@@ -302,6 +330,13 @@ def evaluate_multiframe_consistency(
     outliers = [f for f in valid if f.is_outlier]
     worst = sorted(valid, key=lambda f: f.mean_px, reverse=True)[:top_k_worst]
 
+    # Matched-only, per-frame aggregate -- nan-aware since a single frame can
+    # legitimately have zero matched points (matched_mean_px then NaN)
+    # without that frame's *penalty-inclusive* numbers above being excluded.
+    matched_frame_means = np.array([f.matched_mean_px for f in valid])
+    match_rates = np.array([f.match_rate for f in valid])
+    has_matched = np.isfinite(matched_frame_means).any()
+
     return MultiFrameConsistencyResult(
         frame_results=frame_results,
         n_total=n_total,
@@ -320,6 +355,15 @@ def evaluate_multiframe_consistency(
         max_px=float(np.max(frame_means)),
         mad_px=robust["mad"],
         iqr_px=robust["iqr"],
+        matched_mean_px=float(np.nanmean(matched_frame_means)) if has_matched else float("nan"),
+        matched_median_px=float(np.nanmedian(matched_frame_means)) if has_matched else float("nan"),
+        matched_std_px=float(np.nanstd(matched_frame_means, ddof=1)) if has_matched else float("nan"),
+        matched_p95_px=float(np.nanpercentile(matched_frame_means, 95)) if has_matched else float("nan"),
+        matched_max_px=float(np.nanmax(matched_frame_means)) if has_matched else float("nan"),
+        match_rate_mean=float(np.nanmean(match_rates)) if match_rates.size else float("nan"),
+        match_rate_median=float(np.nanmedian(match_rates)) if match_rates.size else float("nan"),
+        match_rate_min=float(np.nanmin(match_rates)) if match_rates.size else float("nan"),
+        match_rate_p5=float(np.nanpercentile(match_rates, 5)) if match_rates.size else float("nan"),
         sync_offset_median_ms=sync_median_ms,
         sync_offset_p95_ms=sync_p95_ms,
         sync_offset_max_ms=sync_max_ms,

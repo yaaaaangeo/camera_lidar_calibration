@@ -1,0 +1,594 @@
+{
+  "category_counts": {
+    "boundary_0": 39,
+    "circle_0": 9,
+    "circle_1": 3,
+    "circle_2": 1,
+    "plane_fail": 36,
+    "roi_fail": 12
+  },
+  "n_records": 100,
+  "snapshots": [
+    {
+      "category": "plane_fail",
+      "frame_index": 0,
+      "metrics": {
+        "boundary_point_count": 0,
+        "category": "plane_fail",
+        "circle_count": 0,
+        "frame_index": 0,
+        "plane_likeness_current": {
+          "area_m2": NaN,
+          "aspect_similarity": NaN,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": NaN,
+          "hole_candidates": 0,
+          "n": 0,
+          "size_similarity": NaN,
+          "width_m": NaN
+        },
+        "plane_likeness_previous": {
+          "area_m2": NaN,
+          "aspect_similarity": NaN,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": NaN,
+          "hole_candidates": 0,
+          "n": 0,
+          "size_similarity": NaN,
+          "width_m": NaN
+        },
+        "plane_point_count": 0,
+        "radii_m": [],
+        "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+        "roi_point_count": 234
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00000_plane_fail",
+      "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4"
+    },
+    {
+      "category": "plane_fail",
+      "frame_index": 7,
+      "metrics": {
+        "boundary_point_count": 0,
+        "category": "plane_fail",
+        "circle_count": 0,
+        "frame_index": 7,
+        "plane_likeness_current": {
+          "area_m2": NaN,
+          "aspect_similarity": NaN,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": NaN,
+          "hole_candidates": 0,
+          "n": 0,
+          "size_similarity": NaN,
+          "width_m": NaN
+        },
+        "plane_likeness_previous": {
+          "area_m2": NaN,
+          "aspect_similarity": NaN,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": NaN,
+          "hole_candidates": 0,
+          "n": 0,
+          "size_similarity": NaN,
+          "width_m": NaN
+        },
+        "plane_point_count": 0,
+        "radii_m": [],
+        "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+        "roi_point_count": 226
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00007_plane_fail",
+      "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4"
+    },
+    {
+      "category": "plane_fail",
+      "frame_index": 14,
+      "metrics": {
+        "boundary_point_count": 0,
+        "category": "plane_fail",
+        "circle_count": 0,
+        "frame_index": 14,
+        "plane_likeness_current": {
+          "area_m2": NaN,
+          "aspect_similarity": NaN,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": NaN,
+          "hole_candidates": 0,
+          "n": 0,
+          "size_similarity": NaN,
+          "width_m": NaN
+        },
+        "plane_likeness_previous": {
+          "area_m2": NaN,
+          "aspect_similarity": NaN,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": NaN,
+          "hole_candidates": 0,
+          "n": 0,
+          "size_similarity": NaN,
+          "width_m": NaN
+        },
+        "plane_point_count": 0,
+        "radii_m": [],
+        "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+        "roi_point_count": 213
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00014_plane_fail",
+      "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4"
+    },
+    {
+      "category": "boundary_0",
+      "frame_index": 400,
+      "metrics": {
+        "boundary_point_count": 0,
+        "category": "boundary_0",
+        "circle_count": 0,
+        "frame_index": 400,
+        "plane_likeness_current": {
+          "area_m2": 0.26917752211983154,
+          "aspect_similarity": 0.07887277192900224,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 0.135505547302254,
+          "hole_candidates": 0,
+          "n": 62,
+          "size_similarity": 0.5683647004219415,
+          "width_m": 1.9864686537106369
+        },
+        "plane_likeness_previous": {
+          "area_m2": 0.26917752211983154,
+          "aspect_similarity": 0.0788727719290022,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 0.135505547302254,
+          "hole_candidates": 0,
+          "n": 62,
+          "size_similarity": 0.6207915441230994,
+          "width_m": 1.9864686537106369
+        },
+        "plane_point_count": 62,
+        "radii_m": [],
+        "reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)",
+        "roi_point_count": 261
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00400_boundary_0",
+      "reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)"
+    },
+    {
+      "category": "boundary_0",
+      "frame_index": 562,
+      "metrics": {
+        "boundary_point_count": 0,
+        "category": "boundary_0",
+        "circle_count": 0,
+        "frame_index": 562,
+        "plane_likeness_current": {
+          "area_m2": 0.5626013876827823,
+          "aspect_similarity": 0.12429469003853698,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 0.2459239435884231,
+          "hole_candidates": 0,
+          "n": 50,
+          "size_similarity": 0.8418038248192787,
+          "width_m": 2.2877048061019583
+        },
+        "plane_likeness_previous": {
+          "area_m2": 0.5626013876827823,
+          "aspect_similarity": 0.12429469003853692,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 0.2459239435884231,
+          "hole_candidates": 0,
+          "n": 50,
+          "size_similarity": 0.29701869433393496,
+          "width_m": 2.2877048061019583
+        },
+        "plane_point_count": 50,
+        "radii_m": [],
+        "reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)",
+        "roi_point_count": 291
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00562_boundary_0",
+      "reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (0)"
+    },
+    {
+      "category": "boundary_0",
+      "frame_index": 225,
+      "metrics": {
+        "boundary_point_count": 0,
+        "category": "boundary_0",
+        "circle_count": 0,
+        "frame_index": 225,
+        "plane_likeness_current": {
+          "area_m2": 1.108642777519343,
+          "aspect_similarity": 0.09163776284690035,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 0.29641978112239004,
+          "hole_candidates": 0,
+          "n": 122,
+          "size_similarity": 0.427189000463891,
+          "width_m": 3.7401106407996125
+        },
+        "plane_likeness_previous": {
+          "area_m2": 1.108642777519343,
+          "aspect_similarity": 0.09163776284690035,
+          "boundary_score": 0.0,
+          "detector_ok": false,
+          "detector_reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 0.29641978112239004,
+          "hole_candidates": 0,
+          "n": 122,
+          "size_similarity": 0.15072765816767741,
+          "width_m": 3.7401106407996125
+        },
+        "plane_point_count": 122,
+        "radii_m": [],
+        "reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)",
+        "roi_point_count": 240
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00225_boundary_0",
+      "reason": "\uacbd\uacc4\uc810\uc774 \ub108\ubb34 \uc801\uc2b5\ub2c8\ub2e4 (2)"
+    },
+    {
+      "category": "circle_0",
+      "frame_index": 260,
+      "metrics": {
+        "boundary_point_count": 12,
+        "category": "circle_0",
+        "circle_count": 0,
+        "frame_index": 260,
+        "plane_likeness_current": {
+          "area_m2": 32.746982107032075,
+          "aspect_similarity": 0.1446526857059649,
+          "boundary_score": 0.11538461538461539,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 2.024058307150184,
+          "hole_candidates": 0,
+          "n": 104,
+          "size_similarity": 0.014462401403954082,
+          "width_m": 16.17887290665005
+        },
+        "plane_likeness_previous": {
+          "area_m2": 32.746982107032075,
+          "aspect_similarity": 0.14465268570596487,
+          "boundary_score": 0.11538461538461539,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 2.024058307150184,
+          "hole_candidates": 0,
+          "n": 104,
+          "size_similarity": 0.005102855861765543,
+          "width_m": 16.17887290665005
+        },
+        "plane_point_count": 104,
+        "radii_m": [],
+        "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 377
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00260_circle_0",
+      "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    },
+    {
+      "category": "circle_0",
+      "frame_index": 407,
+      "metrics": {
+        "boundary_point_count": 10,
+        "category": "circle_0",
+        "circle_count": 0,
+        "frame_index": 407,
+        "plane_likeness_current": {
+          "area_m2": 0.565599332243854,
+          "aspect_similarity": 0.8866917716748021,
+          "boundary_score": 0.16129032258064516,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 0.6585896636382522,
+          "hole_candidates": 0,
+          "n": 62,
+          "size_similarity": 0.8373418655236511,
+          "width_m": 0.8588038401928584
+        },
+        "plane_likeness_previous": {
+          "area_m2": 0.565599332243854,
+          "aspect_similarity": 0.886691771674802,
+          "boundary_score": 0.16129032258064516,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 0.6585896636382522,
+          "hole_candidates": 0,
+          "n": 62,
+          "size_similarity": 0.2954443544639029,
+          "width_m": 0.8588038401928584
+        },
+        "plane_point_count": 62,
+        "radii_m": [],
+        "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 305
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00407_circle_0",
+      "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    },
+    {
+      "category": "circle_0",
+      "frame_index": 274,
+      "metrics": {
+        "boundary_point_count": 8,
+        "category": "circle_0",
+        "circle_count": 0,
+        "frame_index": 274,
+        "plane_likeness_current": {
+          "area_m2": 3.6580455680232213,
+          "aspect_similarity": 0.03579362670204743,
+          "boundary_score": 0.07079646017699115,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 0.3365127587103264,
+          "hole_candidates": 0,
+          "n": 113,
+          "size_similarity": 0.12946804275484455,
+          "width_m": 10.8704513375438
+        },
+        "plane_likeness_previous": {
+          "area_m2": 3.6580455680232213,
+          "aspect_similarity": 0.035793626702047415,
+          "boundary_score": 0.07079646017699115,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 0.3365127587103264,
+          "hole_candidates": 0,
+          "n": 113,
+          "size_similarity": 0.04568098633344832,
+          "width_m": 10.8704513375438
+        },
+        "plane_point_count": 113,
+        "radii_m": [],
+        "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 359
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00274_circle_0",
+      "reason": "\uc6d0 0\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    },
+    {
+      "category": "circle_1",
+      "frame_index": 555,
+      "metrics": {
+        "boundary_point_count": 18,
+        "category": "circle_1",
+        "circle_count": 1,
+        "frame_index": 555,
+        "plane_likeness_current": {
+          "area_m2": 4.574225509455138,
+          "aspect_similarity": 0.28439377918822084,
+          "boundary_score": 0.1978021978021978,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 1.0607009531409135,
+          "hole_candidates": 1,
+          "n": 91,
+          "size_similarity": 0.10353665314948873,
+          "width_m": 4.312455358798433
+        },
+        "plane_likeness_previous": {
+          "area_m2": 4.574225509455138,
+          "aspect_similarity": 0.2843937791882208,
+          "boundary_score": 0.1978021978021978,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 1.0607009531409135,
+          "hole_candidates": 1,
+          "n": 91,
+          "size_similarity": 0.03653145855065301,
+          "width_m": 4.312455358798433
+        },
+        "plane_point_count": 91,
+        "radii_m": [
+          0.11793259371185501
+        ],
+        "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 671
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00555_circle_1",
+      "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    },
+    {
+      "category": "circle_1",
+      "frame_index": 365,
+      "metrics": {
+        "boundary_point_count": 16,
+        "category": "circle_1",
+        "circle_count": 1,
+        "frame_index": 365,
+        "plane_likeness_current": {
+          "area_m2": 5.5894686791904284,
+          "aspect_similarity": 0.4125080935684781,
+          "boundary_score": 0.14035087719298245,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 1.4121330827456395,
+          "hole_candidates": 1,
+          "n": 114,
+          "size_similarity": 0.08473077266954034,
+          "width_m": 3.958174160414618
+        },
+        "plane_likeness_previous": {
+          "area_m2": 5.5894686791904284,
+          "aspect_similarity": 0.412508093568478,
+          "boundary_score": 0.14035087719298245,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 1.4121330827456395,
+          "hole_candidates": 1,
+          "n": 114,
+          "size_similarity": 0.029896066905629928,
+          "width_m": 3.958174160414618
+        },
+        "plane_point_count": 114,
+        "radii_m": [
+          0.1489681074108135
+        ],
+        "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 350
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00365_circle_1",
+      "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    },
+    {
+      "category": "circle_1",
+      "frame_index": 393,
+      "metrics": {
+        "boundary_point_count": 10,
+        "category": "circle_1",
+        "circle_count": 1,
+        "frame_index": 393,
+        "plane_likeness_current": {
+          "area_m2": 2.9078960183562303,
+          "aspect_similarity": 0.475980053605803,
+          "boundary_score": 0.10526315789473684,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 1.0941023234710232,
+          "hole_candidates": 1,
+          "n": 95,
+          "size_similarity": 0.16286689655007527,
+          "width_m": 2.6577916488934727
+        },
+        "plane_likeness_previous": {
+          "area_m2": 2.9078960183562303,
+          "aspect_similarity": 0.47598005360580287,
+          "boundary_score": 0.10526315789473684,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 1.0941023234710232,
+          "hole_candidates": 1,
+          "n": 95,
+          "size_similarity": 0.05746530431114237,
+          "width_m": 2.6577916488934727
+        },
+        "plane_point_count": 95,
+        "radii_m": [
+          0.13782143555415627
+        ],
+        "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 530
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00393_circle_1",
+      "reason": "\uc6d0 1\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    },
+    {
+      "category": "circle_2",
+      "frame_index": 548,
+      "metrics": {
+        "boundary_point_count": 20,
+        "category": "circle_2",
+        "circle_count": 2,
+        "frame_index": 548,
+        "plane_likeness_current": {
+          "area_m2": 12.69758288395933,
+          "aspect_similarity": 0.9082985825458102,
+          "boundary_score": 0.09900990099009901,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.64,
+          "expected_width_m": 0.74,
+          "height_m": 3.4771252688126038,
+          "hole_candidates": 2,
+          "n": 202,
+          "size_similarity": 0.03729843737411567,
+          "width_m": 3.6517473206524427
+        },
+        "plane_likeness_previous": {
+          "area_m2": 12.69758288395933,
+          "aspect_similarity": 0.9082985825458104,
+          "boundary_score": 0.09900990099009901,
+          "detector_ok": false,
+          "detector_reason": "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+          "expected_height_m": 0.38016,
+          "expected_width_m": 0.43955999999999995,
+          "height_m": 3.4771252688126038,
+          "hole_candidates": 2,
+          "n": 202,
+          "size_similarity": 0.013160231449333478,
+          "width_m": 3.6517473206524427
+        },
+        "plane_point_count": 202,
+        "radii_m": [
+          0.0966468773460943,
+          0.1057499269167185
+        ],
+        "reason": "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)",
+        "roi_point_count": 903
+      },
+      "out_dir": "C:\\Users\\User\\Desktop\\camera_lidar_calibration\\calib_result\\lidar_target_debug_100\\frame_00548_circle_2",
+      "reason": "\uc6d0 2\uac1c \uac80\ucd9c (4\uac1c \ud544\uc694)"
+    }
+  ]
+}

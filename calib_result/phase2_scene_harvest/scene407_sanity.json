@@ -1,0 +1,15 @@
+{
+  "frame_index": 407,
+  "detected_as_valid_scene": false,
+  "stage_reached": "CAMERA_PNP_QUALITY_PASS",
+  "failure_reason": "LIDAR_ROI_INVALID",
+  "funnel": {
+    "CAMERA_PAIR_FOUND": 1,
+    "CAMERA_DETECTION_VALID": 1,
+    "CAMERA_PNP_VALID": 1,
+    "CAMERA_PNP_QUALITY_PASS": 1,
+    "LIDAR_ROI_VALID": 0,
+    "FOUR_CORRESPONDENCES_CREATED": 0
+  },
+  "interpretation": "Frame 407 is not rediscovered by Phase 2A auto harvester because diagnostic seed AUTO ROI fails before LiDAR plane/circle detection. This is a harvesting/ROI regression relative to the manual/oracle 407 result, not evidence that the 407 local 4-point correspondence disappeared."
+}

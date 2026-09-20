@@ -1,0 +1,38 @@
+{
+  "boundary_point_count": 0,
+  "category": "plane_fail",
+  "circle_count": 0,
+  "frame_index": 14,
+  "plane_likeness_current": {
+    "area_m2": NaN,
+    "aspect_similarity": NaN,
+    "boundary_score": 0.0,
+    "detector_ok": false,
+    "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+    "expected_height_m": 0.64,
+    "expected_width_m": 0.74,
+    "height_m": NaN,
+    "hole_candidates": 0,
+    "n": 0,
+    "size_similarity": NaN,
+    "width_m": NaN
+  },
+  "plane_likeness_previous": {
+    "area_m2": NaN,
+    "aspect_similarity": NaN,
+    "boundary_score": 0.0,
+    "detector_ok": false,
+    "detector_reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+    "expected_height_m": 0.38016,
+    "expected_width_m": 0.43955999999999995,
+    "height_m": NaN,
+    "hole_candidates": 0,
+    "n": 0,
+    "size_similarity": NaN,
+    "width_m": NaN
+  },
+  "plane_point_count": 0,
+  "radii_m": [],
+  "reason": "\ud3c9\uba74\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4",
+  "roi_point_count": 213
+}

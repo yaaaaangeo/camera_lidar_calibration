@@ -1,0 +1,70 @@
+{
+  "plane_selection": {
+    "boundary_or_circle_used_for_selection": false,
+    "extent_size_aspect_used_for_selection": false,
+    "first_valid_plane_selected": false,
+    "largest_plane_selected": true,
+    "plane_candidates_kept": 1,
+    "point_count_used_for_selection": true,
+    "ransac_runs_per_detection": 1,
+    "selection_basis": "fit_plane() returns the RANSAC hypothesis with the largest inlier count on the ROI cloud.",
+    "why_large_planes_win": "ROI points are scored only by plane inlier count before boundary/circle detection. A wall, floor, or long strip with more inliers than the board becomes the only selected plane."
+  },
+  "summary": {
+    "avg_candidate_count": 4.181818181818182,
+    "current_board_like": 7,
+    "current_boundary_success": 41,
+    "current_circle_ge1": 12,
+    "current_circle_ge2": 5,
+    "current_circle_ge3": 1,
+    "current_circle_ge4": 1,
+    "current_extent": {
+      "area_m2": {
+        "median": 5.756054287024613,
+        "p95": 117.26943136936755
+      },
+      "height_m": {
+        "median": 2.0147822006479457,
+        "p95": 5.31895627217424
+      },
+      "total_score": {
+        "median": 0.36055902558363506,
+        "p95": 0.6555726851289908
+      },
+      "width_m": {
+        "median": 7.612810522090519,
+        "p95": 24.778521710433612
+      }
+    },
+    "current_full_target": 0,
+    "current_plane_selected": 54,
+    "n_frames": 55,
+    "no_board_like_candidate": 48,
+    "other_candidate_board_like": 0,
+    "reranked_boundary_success": 41,
+    "reranked_circle_ge1": 17,
+    "reranked_circle_ge2": 9,
+    "reranked_circle_ge3": 3,
+    "reranked_circle_ge4": 2,
+    "reranked_extent": {
+      "area_m2": {
+        "median": 7.101749720263514,
+        "p95": 122.85343965183948
+      },
+      "height_m": {
+        "median": 2.0147822006479457,
+        "p95": 5.336482748273455
+      },
+      "total_score": {
+        "median": 0.4029934465274813,
+        "p95": 0.6690288116768697
+      },
+      "width_m": {
+        "median": 5.968852606961596,
+        "p95": 24.80071191312628
+      }
+    },
+    "reranked_full_target": 1,
+    "reranked_plane_selected": 54
+  }
+}

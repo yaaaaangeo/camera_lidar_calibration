@@ -51,7 +51,12 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from gui.core.evaluation.edge_alignment import EdgeAlignmentParams, EdgeAlignmentResult, evaluate_edge_alignment
+from gui.core.evaluation.edge_alignment import (
+    EdgeAlignmentParams,
+    EdgeAlignmentResult,
+    aggregate_point_stats,
+    evaluate_edge_alignment,
+)
 from gui.core.evaluation.edge_correspondence import EdgeOrientationMap, compute_edge_orientation_map
 from gui.core.evaluation.multiframe_consistency import sample_frame_indices
 from gui.core.evaluation.spatial_analysis import SpatialAnalysisResult, analyze_spatial
@@ -232,11 +237,31 @@ class PerturbationPoint:
     delta: float   # degrees for a rotation axis, millimetres for a translation axis
     ok: bool
     reason: str = ""
+    # Penalty-inclusive (pooled over every usable frame's edge points) --
+    # unchanged; see edge_alignment.EdgeAlignmentResult's docstring for what
+    # "penalty-inclusive" means and why it is kept rather than replaced.
     mean_px: float = float("nan")
     median_px: float = float("nan")
     p95_px: float = float("nan")
     max_px: float = float("nan")
     match_rate: float = float("nan")
+
+    # Matched-only + signed offset, same pooled points, computed alongside
+    # the penalty-inclusive numbers above by `_pool_for_spatial` -- read
+    # these two together with `match_rate`, never `matched_mean_px` alone,
+    # since a low match rate means it describes a shrinking subset of the
+    # axis's points, not "the rest were fine".
+    matched_mean_px: float = float("nan")
+    matched_median_px: float = float("nan")
+    matched_p95_px: float = float("nan")
+    matched_p99_px: float = float("nan")
+    matched_max_px: float = float("nan")
+    match_rate_by_threshold_px: dict = field(default_factory=dict)
+    mean_delta_u_px: float = float("nan")
+    median_delta_u_px: float = float("nan")
+    mean_delta_v_px: float = float("nan")
+    median_delta_v_px: float = float("nan")
+
     n_edge_points: int = 0
     n_valid_frames: int = 0
     n_failed_frames: int = 0
@@ -321,7 +346,12 @@ class PerturbationResult:
 def _pool_for_spatial(results: list) -> "tuple[EdgeAlignmentResult, int, int]":
     """Concatenate every `ok=True` result's per-point arrays into one
     EdgeAlignmentResult-shaped object, so `spatial_analysis.analyze_spatial`
-    can be reused exactly as-is instead of learning a multi-frame variant."""
+    can be reused exactly as-is instead of learning a multi-frame variant.
+    Matched-only/signed-delta/threshold aggregates are derived from the same
+    pooled arrays via `aggregate_point_stats` -- the one place those numbers
+    are computed, shared with `evaluate_edge_alignment`'s own single-frame
+    call, so pooling never produces them a second, different way.
+    """
     ok_results = [r for r in results if r.ok]
     if not ok_results:
         return EdgeAlignmentResult(ok=False, reason="no valid frame"), 0, len(results)
@@ -330,8 +360,11 @@ def _pool_for_spatial(results: list) -> "tuple[EdgeAlignmentResult, int, int]":
     depths = np.concatenate([r.edge_depths for r in ok_results])
     errors = np.concatenate([r.edge_errors_px for r in ok_results])
     matched = np.concatenate([r.edge_matched for r in ok_results])
+    delta_u = np.concatenate([r.edge_delta_u_px for r in ok_results])
+    delta_v = np.concatenate([r.edge_delta_v_px for r in ok_results])
     n_edge_points = int(errors.shape[0])
     n_matched = int(matched.sum())
+    agg = aggregate_point_stats(errors, matched, delta_u, delta_v)
 
     pooled = EdgeAlignmentResult(
         ok=True,
@@ -344,7 +377,18 @@ def _pool_for_spatial(results: list) -> "tuple[EdgeAlignmentResult, int, int]":
         n_matched=n_matched,
         n_unmatched=n_edge_points - n_matched,
         match_rate=n_matched / n_edge_points if n_edge_points else float("nan"),
+        matched_mean_px=agg["matched_mean_px"],
+        matched_median_px=agg["matched_median_px"],
+        matched_p95_px=agg["matched_p95_px"],
+        matched_p99_px=agg["matched_p99_px"],
+        matched_max_px=agg["matched_max_px"],
+        match_rate_by_threshold_px=agg["match_rate_by_threshold_px"],
+        mean_delta_u_px=agg["mean_delta_u_px"],
+        median_delta_u_px=agg["median_delta_u_px"],
+        mean_delta_v_px=agg["mean_delta_v_px"],
+        median_delta_v_px=agg["median_delta_v_px"],
         edge_pixels=pixels, edge_depths=depths, edge_errors_px=errors, edge_matched=matched,
+        edge_delta_u_px=delta_u, edge_delta_v_px=delta_v,
     )
     return pooled, len(ok_results), len(results) - len(ok_results)
 
@@ -518,7 +562,7 @@ def summarize_axis(
     )
 
 
-def _run_trial_point(
+def run_trial_point(
     kind: str, axis: str, delta: float, usable_frames: list,
     baseline_R: np.ndarray, baseline_t: np.ndarray, camera,
     min_range: float, max_range: float, edge_params: EdgeAlignmentParams,
@@ -526,8 +570,12 @@ def _run_trial_point(
 ) -> PerturbationPoint:
     """Perturb one parameter, evaluate every usable frame against the result,
     and package it as a PerturbationPoint -- the one piece of per-trial work
-    shared by the Quick/Full grid (`evaluate_perturbation_grid`) and Fine Scan
-    (`evaluate_single_axis`), so the two cannot silently drift apart."""
+    shared by the Quick/Full grid (`evaluate_perturbation_grid`), Fine Scan
+    (`evaluate_single_axis`), and Independent Hold-out Validation
+    (`gui.core.evaluation.holdout.evaluate_holdout`, which scores a locked
+    baseline/candidate pair the same way against a held-out frame set), so
+    none of the three can silently drift apart in how a trial is scored.
+    Public (no leading underscore) for exactly that third caller."""
     if delta == 0.0:
         R, t = baseline_R, baseline_t
     elif kind == "rotation":
@@ -542,6 +590,11 @@ def _run_trial_point(
         delta=delta, ok=pooled.ok, reason=pooled.reason,
         mean_px=pooled.mean_px, median_px=pooled.median_px,
         p95_px=pooled.p95_px, max_px=pooled.max_px, match_rate=pooled.match_rate,
+        matched_mean_px=pooled.matched_mean_px, matched_median_px=pooled.matched_median_px,
+        matched_p95_px=pooled.matched_p95_px, matched_p99_px=pooled.matched_p99_px,
+        matched_max_px=pooled.matched_max_px, match_rate_by_threshold_px=pooled.match_rate_by_threshold_px,
+        mean_delta_u_px=pooled.mean_delta_u_px, median_delta_u_px=pooled.median_delta_u_px,
+        mean_delta_v_px=pooled.mean_delta_v_px, median_delta_v_px=pooled.median_delta_v_px,
         n_edge_points=pooled.n_edge_points if pooled.ok else 0,
         n_valid_frames=n_valid, n_failed_frames=n_failed,
         n_sync_rejected_frames=n_sync_rejected, spatial=spatial, per_frame=per_frame,
@@ -601,7 +654,7 @@ def evaluate_perturbation_grid(
         if delta == 0.0 and baseline_point is not None:
             point = baseline_point
         else:
-            point = _run_trial_point(
+            point = run_trial_point(
                 kind, axis, delta, usable, baseline_R, baseline_t, camera,
                 min_range, max_range, edge_params, n_sync_rejected,
             )
@@ -662,7 +715,7 @@ def evaluate_single_axis(
     the caller's range does not land on it exactly, since a baseline point is
     required.
 
-    Shares `_run_trial_point`/`_evaluate_trial`/`summarize_axis` with
+    Shares `run_trial_point`/`_evaluate_trial`/`summarize_axis` with
     `evaluate_perturbation_grid`, so the two can never silently diverge in how
     a trial is scored -- only which deltas are tried differs.
     """
@@ -681,7 +734,7 @@ def evaluate_single_axis(
     for done, delta in enumerate(deltas, start=1):
         if should_cancel is not None and should_cancel():
             break
-        point = _run_trial_point(
+        point = run_trial_point(
             kind, axis, delta, usable, baseline_R, baseline_t, camera,
             min_range, max_range, edge_params, n_sync_rejected,
         )

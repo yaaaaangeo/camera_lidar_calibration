@@ -38,6 +38,7 @@ from typing import Optional
 
 import numpy as np
 
+from gui.core.evaluation import holdout as ho
 from gui.core.evaluation.multiframe_consistency import DEFAULT_HAMPEL_K, compute_robust_stats, flag_outliers_hampel
 from gui.core.evaluation.perturbation import AXIS_LABELS, DEFAULT_LOCAL_MIN_TOLERANCE_PX, ROTATION_AXES, TRANSLATION_AXES
 from gui.core.evaluation.spatial_analysis import DEPTH_BIN_LABELS, HORIZONTAL_REGIONS, VERTICAL_REGIONS
@@ -61,7 +62,10 @@ CAT_DEPTH = "Depth dependence"
 CAT_TEMPORAL = "Temporal pairing quality"
 CAT_STABILITY = "Multi-frame stability"
 CAT_CALIBRATION = "Calibration-scene stability"
-CATEGORY_ORDER = (CAT_ROTATION, CAT_TRANSLATION, CAT_SPATIAL, CAT_DEPTH, CAT_TEMPORAL, CAT_STABILITY, CAT_CALIBRATION)
+CAT_HOLDOUT = "Independent hold-out validation"
+CATEGORY_ORDER = (
+    CAT_ROTATION, CAT_TRANSLATION, CAT_SPATIAL, CAT_DEPTH, CAT_TEMPORAL, CAT_STABILITY, CAT_CALIBRATION, CAT_HOLDOUT,
+)
 
 SCOPE_MULTI = "multi_frame"
 SCOPE_SINGLE = "current_frame"
@@ -88,7 +92,16 @@ class DiagnosticThresholds:
     """Every cut-off the rules use. Defaults are deliberately conservative:
     Strong needs a clear majority of frames improving, near-full coverage, few
     frames getting worse, *and* a paired per-frame improvement -- one pooled
-    number moving is never enough on its own."""
+    number moving is never enough on its own.
+
+    These are configurable heuristic defaults for this project, not an
+    empirically calibrated correctness threshold for any particular sensor
+    pair. Nothing here has been validated against ground truth across
+    sensors/mounts/scenes -- they were chosen to be conservative (biased
+    toward Insufficient/Weak over Strong) and are exposed as fields
+    specifically so a project with different data can override them, not
+    because "0.05 px" or "70%" are physically meaningful cut-offs.
+    """
 
     # Same tolerance Perturbation Sensitivity uses for "local minimum" and for
     # counting a frame as improved/worsened -- a smaller change is noise.
@@ -201,6 +214,13 @@ class DiagnosticInputs:
     current_frame: Optional[object] = None         # edge_alignment.EdgeAlignmentResult
     current_frame_spatial: Optional[object] = None  # spatial_analysis.SpatialAnalysisResult
     calibration: Optional[CalibrationContext] = None
+    holdout: Optional[object] = None                # holdout.HoldoutResult
+    # One of holdout.STATUS_INDEPENDENT (default), STATUS_INDEPENDENT_REPEATED,
+    # or the two holdout.EXPOSED_STATUSES -- whether `holdout` still describes
+    # a candidate untouched since it (or its dataset) was first validated.
+    # Computed by the caller (it depends on session history the result itself
+    # cannot see) -- see step_verify.VerifyStep._holdout_status.
+    holdout_status: str = ho.STATUS_INDEPENDENT
     notes: list = field(default_factory=list)      # caller context, e.g. results excluded as stale
 
 
@@ -888,6 +908,248 @@ def assess_calibration(ctx: Optional[CalibrationContext], th: DiagnosticThreshol
     return item
 
 
+def assess_holdout(result, status: str = ho.STATUS_INDEPENDENT, th: DiagnosticThresholds = DEFAULT_THRESHOLDS) -> EvidenceItem:
+    """Independent Hold-out Validation, exactly as `holdout.evaluate_holdout`
+    already computed it -- never re-evaluated, never re-searched here.
+
+    A candidate is chosen from Discovery data (Perturbation Sensitivity /
+    Fine Scan); this category asks a narrower question about that *same*
+    already-chosen candidate: did the improvement seen during discovery
+    reproduce on data the candidate was never searched against. It never
+    proposes a candidate on its own -- `candidate_eligible=False` -- because
+    doing so would double-count the rotation/translation-sensitivity evidence
+    that already names the candidate; this item exists to corroborate (or
+    fail to corroborate) that evidence, not to repeat it.
+
+    `status` -- one of `holdout.STATUS_INDEPENDENT`,
+    `STATUS_INDEPENDENT_REPEATED`, or the two `holdout.EXPOSED_STATUSES`
+    (`STATUS_EXPOSED_CANDIDATE_CHANGED` / `STATUS_EXPOSED_DISCOVERY_UPDATED`)
+    -- is supplied by the caller, not read off `result`: exposure depends on
+    session history (has this candidate, or this Discovery generation,
+    already been superseded since this dataset was first shown) that the
+    result itself has no way to see -- see `holdout.classify_exposure`. Any
+    status in `EXPOSED_STATUSES` renames this category "Exploratory
+    validation" and caps it at Weak regardless of how good the numbers look:
+    a result seen before further candidate tuning is exploratory, not
+    independent, evidence.
+
+    Never above Moderate/Weak purely from one hold-out run with few frames --
+    the coverage gate below (`min_comparable_frames` /
+    `insufficient_coverage_ratio`, the same ones axis evidence uses) applies
+    identically here. A Strong rating additionally requires the block-
+    bootstrap 95% interval for the median ΔFrame-P95 to exclude zero -- a
+    point estimate that looks good but sits inside an interval spanning zero
+    is capped at Moderate.
+    """
+    exploratory = status in ho.EXPOSED_STATUSES
+    title = "Exploratory validation" if exploratory else "Independent hold-out validation"
+    item = EvidenceItem(CAT_HOLDOUT, title, UNAVAILABLE, SCOPE_MULTI, key="holdout", candidate_eligible=False)
+    if result is None:
+        item.observations.append("No hold-out validation has been run.")
+        return item
+    if result.cancelled:
+        item.observations.append(result.reason or "Hold-out validation was cancelled.")
+        return item
+    if not result.ok or result.axis is None or result.axis.baseline is None:
+        item.strength = INSUFFICIENT
+        item.observations.append(result.reason or "Hold-out validation could not be evaluated.")
+        return item
+
+    cand = result.candidate
+    baseline = result.baseline_point
+    candidate_point = result.candidate_point
+    if candidate_point is None or not baseline.ok:
+        item.strength = INSUFFICIENT
+        item.observations.append("Hold-out baseline could not be evaluated.")
+        return item
+
+    unit = "°" if cand.unit == "deg" else " mm"
+    n_base = baseline.n_valid_frames
+    n_cmp = candidate_point.n_comparable_frames
+    coverage = n_cmp / n_base if n_base else float("nan")
+    imp_ratio = candidate_point.improved_frame_ratio
+    worse_ratio = candidate_point.n_worsened_frames / n_cmp if n_cmp else float("nan")
+    median_delta = candidate_point.median_delta_frame_p95_px
+    bs = result.bootstrap
+    item.consistency = imp_ratio if _finite(imp_ratio) else float("nan")
+
+    if exploratory:
+        item.observations.append(f"{ho.STATUS_LABELS.get(status, status)}.")
+
+    item.metrics += [
+        ("Candidate", f"{cand.label} {cand.delta:+.2f}{unit}"),
+        ("Source", cand.source.capitalize()),
+        ("Validation status", ho.STATUS_LABELS.get(status, status)),
+        ("Hold-out frames", f"{result.n_frames_used} / {result.n_frames_requested}"),
+        ("Sync rejected", str(result.n_sync_rejected)),
+    ]
+    if result.discovery is not None:
+        item.metrics.append(("Discovery exclusion margin", f"{result.discovery.exclusion_margin_s:.1f} sec"))
+    if result.provenance is not None and result.provenance.excluded_near_discovery:
+        item.metrics.append(("Excluded near Discovery", str(len(result.provenance.excluded_near_discovery))))
+    if result.n_frames_used < ho.DEFAULT_MIN_INDEPENDENT_FRAMES:
+        item.observations.append(
+            f"Independence limited: only {result.n_frames_used} hold-out frame(s) were evaluated "
+            f"(< {ho.DEFAULT_MIN_INDEPENDENT_FRAMES}); read this result cautiously."
+        )
+    if result.signature_warning:
+        item.caveats.append(result.signature_warning)
+    if result.cross_bag_time_overlap_note:
+        item.caveats.append(result.cross_bag_time_overlap_note)
+
+    item.metrics += [
+        ("Baseline Median Frame-P95", _px(baseline.median_frame_p95_px)),
+        ("Candidate Median Frame-P95", _px(candidate_point.median_frame_p95_px)),
+        ("Comparable frames", _ratio_text(n_cmp, n_base)),
+        ("Improved", _ratio_text(candidate_point.n_improved_frames, n_cmp)),
+        ("Worsened", _ratio_text(candidate_point.n_worsened_frames, n_cmp)),
+        ("Unchanged", _ratio_text(candidate_point.n_unchanged_frames, n_cmp)),
+        ("Median ΔFrame-P95", f"{median_delta:+.2f} px" if _finite(median_delta) else "—"),
+    ]
+    if bs is not None:
+        item.metrics += [
+            ("Bootstrap method", bs.method or "—"),
+            ("Median Frame Interval", f"{bs.median_frame_interval_s:.2f} s" if _finite(bs.median_frame_interval_s) else "—"),
+            ("Bootstrap Block Duration", f"{bs.block_s:.1f} s"),
+            ("Effective Temporal Blocks", str(bs.n_blocks)),
+        ]
+        if bs.n_blocks:
+            item.metrics.append((
+                "Frames / Block",
+                f"median {bs.frames_per_block_median:.1f}, range {bs.frames_per_block_min}-{bs.frames_per_block_max}",
+            ))
+        if bs.sparse_sampling:
+            item.caveats.append(
+                "Most bootstrap blocks contain only one evaluated frame. Temporal dependence may be weakly "
+                "represented by this bootstrap configuration."
+            )
+    if bs is not None and bs.ok:
+        item.metrics.append((
+            "95% Block-Bootstrap CI",
+            f"[{bs.median_delta_ci_low_px:+.2f}, {bs.median_delta_ci_high_px:+.2f}] px "
+            f"({bs.n_blocks} blocks, {bs.iterations} iters, {bs.block_s:.1f}s/block)",
+        ))
+        item.metrics.append((
+            "Improved Ratio CI",
+            f"[{bs.improved_ratio_ci_low * 100:.1f}, {bs.improved_ratio_ci_high * 100:.1f}] %",
+        ))
+    elif bs is not None:
+        item.metrics.append(("95% Block-Bootstrap CI", bs.reason or "unavailable"))
+    if candidate_point.n_baseline_only_valid:
+        item.metrics.append(("Baseline-only valid", str(candidate_point.n_baseline_only_valid)))
+    if candidate_point.n_candidate_only_valid:
+        item.metrics.append(("Candidate-only valid", str(candidate_point.n_candidate_only_valid)))
+    if candidate_point.n_both_failed:
+        item.metrics.append(("Both failed", str(candidate_point.n_both_failed)))
+
+    if n_cmp < th.min_comparable_frames or not _finite(coverage) or coverage < th.insufficient_coverage_ratio:
+        item.strength = INSUFFICIENT
+        item.observations.append(
+            f"Only {n_cmp} of {n_base} baseline-valid hold-out frames are comparable "
+            f"(need at least {th.min_comparable_frames} and {th.insufficient_coverage_ratio:.0%})."
+        )
+        item.caveats.append("Independent hold-out validation, not a candidate search -- see the module docstring.")
+        return item
+
+    reproduced = (
+        _finite(median_delta) and median_delta <= -th.improvement_tolerance_px
+        and _finite(imp_ratio) and imp_ratio >= th.moderate_improved_ratio
+        and _finite(worse_ratio) and worse_ratio <= th.moderate_max_worsened_ratio
+    )
+    strong = reproduced and (
+        imp_ratio >= th.strong_improved_ratio and coverage >= th.strong_min_coverage_ratio
+        and worse_ratio <= th.strong_max_worsened_ratio
+    )
+
+    if strong:
+        item.strength = STRONG
+    elif reproduced:
+        item.strength = MODERATE
+    elif _finite(median_delta) and median_delta > th.improvement_tolerance_px:
+        item.strength = NOT_OBSERVED
+    else:
+        item.strength = WEAK
+
+    # A point estimate alone never earns Strong: the block-bootstrap interval
+    # for the median must also exclude zero. bs.median_ci_excludes_zero is
+    # None when no interval could be computed (too few comparable frames or
+    # temporal blocks) -- also not enough to claim Strong.
+    ci_excludes_zero = bs.median_ci_excludes_zero if bs is not None else None
+    if item.strength == STRONG and ci_excludes_zero is not True:
+        item.strength = MODERATE
+        item.caveats.append(
+            "Not rated Strong because the 95% block-bootstrap interval for the median ΔFrame-P95 does not "
+            "(or could not be shown to) exclude zero."
+        )
+    if ci_excludes_zero is False:
+        item.observations.append(
+            "The estimated improvement is uncertain on this hold-out set: the 95% block-bootstrap interval "
+            f"[{bs.median_delta_ci_low_px:+.2f}, {bs.median_delta_ci_high_px:+.2f}] px includes zero."
+        )
+    elif ci_excludes_zero is True and item.strength in CANDIDATE_STRENGTHS:
+        item.observations.append(
+            f"The 95% block-bootstrap interval for the median ΔFrame-P95 is entirely "
+            f"{'below' if bs.median_delta_ci_high_px < 0 else 'above'} zero: "
+            f"[{bs.median_delta_ci_low_px:+.2f}, {bs.median_delta_ci_high_px:+.2f}] px."
+        )
+    elif bs is not None and not bs.ok:
+        item.caveats.append(f"Uncertainty estimate unavailable: {bs.reason}")
+
+    if item.strength in (STRONG, MODERATE):
+        item.observations.append(
+            f"Candidate improvement reproduced on independent hold-out data. "
+            f"Median ΔFrame-P95: {median_delta:+.2f} px. "
+            f"{candidate_point.n_improved_frames} / {n_cmp} comparable frames improved."
+        )
+        item.interpretations.append(
+            f"The lower-error behaviour observed for {cand.label} {cand.delta:+.2f}{unit} during discovery was "
+            "also observed on independent validation data."
+        )
+    elif item.strength == NOT_OBSERVED:
+        item.observations.append(
+            f"Candidate did not improve on hold-out data. Median ΔFrame-P95: {median_delta:+.2f} px "
+            f"({candidate_point.n_improved_frames} / {n_cmp} frames improved)."
+        )
+        item.interpretations.append(
+            "The improvement observed during discovery did not reproduce on independent validation data."
+        )
+    else:
+        # median_delta is always finite here: n_cmp >= min_comparable_frames (checked above), so
+        # candidate_point's paired-delta array (computed over comparable frames) is never empty.
+        item.observations.append(
+            f"Candidate improvement did not reproduce consistently on hold-out data. "
+            f"Median ΔFrame-P95: {median_delta:+.2f} px. "
+            f"{candidate_point.n_improved_frames} / {n_cmp} comparable frames improved."
+        )
+        item.interpretations.append(
+            "The improvement observed during discovery did not reproduce consistently on independent "
+            "validation data."
+        )
+
+    if _finite(worse_ratio) and worse_ratio >= th.mixed_worsened_ratio:
+        item.mixed = True
+        item.observations.append(f"{candidate_point.n_worsened_frames} of {n_cmp} hold-out frames got worse.")
+    if candidate_point.coverage_warning:
+        item.caveats.append(candidate_point.coverage_warning)
+    if exploratory:
+        item.strength = cap_strength(item.strength, WEAK)
+    item.caveats.append(
+        "Candidate was selected using Discovery data; hold-out data is used only to validate it, never to "
+        "search for a better offset -- see gui.core.evaluation.holdout's module docstring."
+    )
+    item.caveats.append(
+        "If Perturbation Sensitivity or Fine Scan is re-run after seeing this hold-out result and a new "
+        "candidate is locked from it, this result no longer validates an untouched candidate -- run a fresh "
+        "hold-out on the new candidate instead of reading this one as if it still applies."
+    )
+    item.caveats.append(
+        "Confidence interval only: does not by itself confirm which extrinsic axis is responsible, and is "
+        "never a p-value or a pass/fail gate."
+    )
+    item.caveats.append(DISCLAIMER)
+    return item
+
+
 # -------------------------------------------------------------------- report
 
 
@@ -975,6 +1237,7 @@ def build_diagnostic_report(inputs: DiagnosticInputs, th: DiagnosticThresholds =
     evidence.append(temporal)
     evidence.append(assess_stability(mf, pert, th))
     evidence.append(assess_calibration(inputs.calibration, th))
+    evidence.append(assess_holdout(inputs.holdout, inputs.holdout_status, th))
 
     if temporal.strength == WEAK:
         for item in evidence:

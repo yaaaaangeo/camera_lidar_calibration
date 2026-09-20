@@ -106,6 +106,16 @@ class Solution:
         return (self.R @ np.asarray(xyz, np.float64).T).T + self.t
 
 
+@dataclass
+class PreparedScene:
+    """The exact per-scene point ordering consumed by the rigid fit."""
+
+    scene_id: str
+    lidar_sorted: np.ndarray
+    camera_sorted: np.ndarray
+    assignment_shift: int
+
+
 def solve_rigid(lidar: np.ndarray, camera: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Kabsch: the rotation and translation taking `lidar` points onto `camera`."""
     mu_l, mu_c = lidar.mean(axis=0), camera.mean(axis=0)
@@ -116,7 +126,97 @@ def solve_rigid(lidar: np.ndarray, camera: np.ndarray) -> tuple[np.ndarray, np.n
     return R, mu_c - R @ mu_l
 
 
+def prepare_correspondences(
+    scenes: list[tuple[str, np.ndarray, np.ndarray]],
+) -> tuple[list[PreparedScene], str]:
+    """Return sorted/rolled correspondences using the same policy as `solve`."""
+    if not scenes:
+        return [], "no scenes"
+
+    ids, L_sets, C_sets = [], [], []
+    for sid, lidar_pts, cam_pts in scenes:
+        try:
+            L_sets.append(sort_centers(np.asarray(lidar_pts, np.float64), "lidar"))
+            C_sets.append(sort_centers(np.asarray(cam_pts, np.float64), "camera"))
+            ids.append(sid)
+        except ValueError:
+            continue
+
+    if len(ids) < 1:
+        return [], "no usable scenes"
+
+    def fit(assignment):
+        L_ = np.vstack([np.roll(s_, sh, axis=0) for s_, sh in zip(L_sets, assignment)])
+        C_ = np.vstack(C_sets)
+        R_, t_ = solve_rigid(L_, C_)
+        return L_, C_, R_, t_
+
+    def rmse_of(assignment) -> float:
+        L_, C_, R_, t_ = fit(assignment)
+        return float(np.sqrt((np.linalg.norm((R_ @ L_.T).T + t_ - C_, axis=1) ** 2).mean()))
+
+    # Same half-turn policy as solve(): resolve each scene with the upright
+    # physical check where possible, then let only undecided scenes agree with
+    # the already-settled ones.
+    assignment, undecided = [], []
+    for i, (s_, c_) in enumerate(zip(L_sets, C_sets)):
+        up = [sh for sh in (0, 2)
+              if is_upright(solve_rigid(np.roll(s_, sh, axis=0), c_)[0])]
+        if len(up) == 1:
+            assignment.append(up[0])
+        else:
+            assignment.append(0)
+            undecided.append(i)
+
+    best_rmse = rmse_of(assignment)
+    for _ in range(3):
+        changed = False
+        for i in undecided:
+            trial = list(assignment)
+            trial[i] = 2 - trial[i]
+            err = rmse_of(trial)
+            if err < best_rmse:
+                assignment, best_rmse, changed = trial, err, True
+        if not changed:
+            break
+
+    return [
+        PreparedScene(
+            scene_id=sid,
+            lidar_sorted=np.roll(lidar, shift, axis=0),
+            camera_sorted=camera,
+            assignment_shift=int(shift),
+        )
+        for sid, lidar, camera, shift in zip(ids, L_sets, C_sets, assignment)
+    ], ""
+
+
 def solve(scenes: list[tuple[str, np.ndarray, np.ndarray]]) -> Solution:
+    """Fit one extrinsic to every scene at once."""
+    prepared, reason = prepare_correspondences(scenes)
+    if not prepared:
+        return Solution(False, reason=reason)
+
+    ids = [s.scene_id for s in prepared]
+    L = np.vstack([s.lidar_sorted for s in prepared])
+    C = np.vstack([s.camera_sorted for s in prepared])
+    R, t = solve_rigid(L, C)
+    residual = np.linalg.norm((R @ L.T).T + t - C, axis=1)
+
+    per_scene = {
+        sid: float(np.sqrt((residual[i * 4 : i * 4 + 4] ** 2).mean())) for i, sid in enumerate(ids)
+    }
+    return Solution(
+        ok=True,
+        R=R,
+        t=t,
+        rmse=float(np.sqrt((residual**2).mean())),
+        per_point=residual,
+        scene_ids=ids,
+        per_scene_rmse=per_scene,
+        n_pairs=len(L),
+    )
+
     """Fit one extrinsic to every scene at once.
 
     `scenes` is (id, lidar centres, camera centres); each pair gets sorted here

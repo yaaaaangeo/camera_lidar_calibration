@@ -1,0 +1,153 @@
+name: untitled
+bag_paths:
+- C:\Users\User\Desktop\camera_lidar_calibration\rosbag2_2026_09_14-11_23_03
+lidar_topic: /ot128_points
+camera_topic: /video1/image_raw/compressed
+camera:
+  fx: 1893.17165093
+  fy: 1908.9202969
+  cx: 1925.70258899
+  cy: 1117.03748916
+  k1: 0.42240686623
+  k2: -0.0743999354354
+  p1: -0.000474772089682
+  p2: 6.33139555959e-06
+  k3: -0.00394194341999
+  k4: 0.799054461746
+  k5: -0.0233894025699
+  k6: -0.0228725702806
+target:
+  marker_size: 0.2
+  delta_width_qr_center: 0.55
+  delta_height_qr_center: 0.35
+  delta_width_circles: 0.5
+  delta_height_circles: 0.4
+  circle_radius: 0.12
+validation_history: {}
+scenes:
+- id: s01
+  t_ns: 1789352584308166399
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: 1.8674666225960235
+    x_max: 8.328762323923543
+    y_min: -8.29106035713912
+    y_max: -5.66461726438384
+    z_min: -0.9563964953285822
+    z_max: -0.8363964953285823
+    yaw: -138.7441987677552
+    pitch: -0.0
+    roll: 88.23639199893417
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s02
+  t_ns: 1789352597188750790
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: 3.956349225984223
+    x_max: 9.055506952163169
+    y_min: -6.20311514126533
+    y_max: -3.5149870815386626
+    z_min: -0.9205154852742494
+    z_max: -0.8005154852742493
+    yaw: -110.08215627968413
+    pitch: -0.0
+    roll: 89.4866583794263
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s03
+  t_ns: 1789352645202841854
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: -0.7620067499684344
+    x_max: 1.4417392896715544
+    y_min: -12.579393889147024
+    y_max: -10.293113038268007
+    z_min: -1.139683887814805
+    z_max: -1.019683887814805
+    yaw: 174.93594524024724
+    pitch: -0.0
+    roll: 86.49012706566505
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s04
+  t_ns: 1789352600309619956
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: 3.985690978621493
+    x_max: 8.356460201709973
+    y_min: -6.9178317703568695
+    y_max: -4.028348743387639
+    z_min: -0.8227771460656665
+    z_max: -0.7027771460656664
+    yaw: -111.4431222450088
+    pitch: -0.0
+    roll: 87.82126556177985
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s05
+  t_ns: 1789352617299289292
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: 4.311678729130101
+    x_max: 9.093015266177222
+    y_min: -10.01477571987047
+    y_max: -7.5594394387961525
+    z_min: -1.0937076914575907
+    z_max: -0.9737076914575906
+    yaw: -107.16428177336586
+    pitch: -0.0
+    roll: 95.09914542247516
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s06
+  t_ns: 1789352628207273273
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: 5.2109129518009425
+    x_max: 7.424301902600137
+    y_min: -11.91837363592306
+    y_max: -9.594416932560453
+    z_min: -1.1594613082550091
+    z_max: -1.039461308255009
+    yaw: -159.05957604909972
+    pitch: -0.0
+    roll: 90.5797896393782
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true
+- id: s07
+  t_ns: 1789352651196150036
+  bag: rosbag2_2026_09_14-11_23_03
+  frames: 1
+  filter:
+    x_min: -2.005248358607484
+    x_max: 1.4535995279384792
+    y_min: -12.13450224008388
+    y_max: -9.981622815429315
+    z_min: -1.1985226891687617
+    z_max: -1.0785226891687616
+    yaw: 176.6687766591287
+    pitch: -0.0
+    roll: 88.7293022131922
+  region:
+    corners: []
+    thickness: 0.1
+  enabled: true

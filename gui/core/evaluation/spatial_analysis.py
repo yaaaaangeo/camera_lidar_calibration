@@ -22,7 +22,7 @@ from typing import Optional
 
 import numpy as np
 
-from gui.core.evaluation.edge_alignment import EdgeAlignmentResult
+from gui.core.evaluation.edge_alignment import EdgeAlignmentResult, aggregate_point_stats
 
 DEPTH_BIN_EDGES = (0.0, 10.0, 20.0, 30.0, 50.0, float("inf"))
 DEPTH_BIN_LABELS = ("0-10m", "10-20m", "20-30m", "30-50m", "50m+")
@@ -34,7 +34,7 @@ VERTICAL_REGIONS = ("TOP", "CENTER", "BOTTOM")
 @dataclass
 class BinStats:
     label: str
-    mean_px: float
+    mean_px: float          # Penalty-inclusive (unchanged) -- see edge_alignment.EdgeAlignmentResult's docstring
     median_px: float
     p95_px: float
     std_px: float
@@ -42,12 +42,27 @@ class BinStats:
     n_matched: int
     n_unmatched: int
 
+    # Matched-only + signed offset, this bin's own points only -- so "is the
+    # near-field error real or just more unmatched points there" can be read
+    # per depth/region bin, not only for the whole frame. NaN when the bin
+    # has no matched points.
+    match_rate: float = float("nan")
+    matched_mean_px: float = float("nan")
+    matched_median_px: float = float("nan")
+    mean_delta_u_px: float = float("nan")
+    median_delta_u_px: float = float("nan")
+    mean_delta_v_px: float = float("nan")
+    median_delta_v_px: float = float("nan")
 
-def _bin_stats(label: str, errors: np.ndarray, matched: Optional[np.ndarray]) -> BinStats:
+
+def _bin_stats(label: str, errors: np.ndarray, matched: Optional[np.ndarray],
+                delta_u: Optional[np.ndarray] = None, delta_v: Optional[np.ndarray] = None) -> BinStats:
     n = errors.shape[0]
     if n == 0:
         return BinStats(label, float("nan"), float("nan"), float("nan"), float("nan"), 0, 0, 0)
-    n_matched = int(matched.sum()) if matched is not None else n
+    matched_arr = matched if matched is not None else np.ones(n, dtype=bool)
+    n_matched = int(matched_arr.sum())
+    agg = aggregate_point_stats(errors, matched_arr, delta_u, delta_v)
     return BinStats(
         label=label,
         mean_px=float(np.mean(errors)),
@@ -57,6 +72,13 @@ def _bin_stats(label: str, errors: np.ndarray, matched: Optional[np.ndarray]) ->
         n_points=n,
         n_matched=n_matched,
         n_unmatched=n - n_matched,
+        match_rate=n_matched / n if n else float("nan"),
+        matched_mean_px=agg["matched_mean_px"],
+        matched_median_px=agg["matched_median_px"],
+        mean_delta_u_px=agg["mean_delta_u_px"],
+        median_delta_u_px=agg["median_delta_u_px"],
+        mean_delta_v_px=agg["mean_delta_v_px"],
+        median_delta_v_px=agg["median_delta_v_px"],
     )
 
 
@@ -97,24 +119,35 @@ def analyze_spatial(result: EdgeAlignmentResult, image_width: int, image_height:
     depths = result.edge_depths
     pixels = result.edge_pixels
     matched = result.edge_matched
+    delta_u = result.edge_delta_u_px
+    delta_v = result.edge_delta_v_px
 
     depth_idx = bin_by_depth(depths)
     h_idx = bin_by_horizontal(pixels[:, 0], image_width)
     v_idx = bin_by_vertical(pixels[:, 1], image_height)
 
+    def _sel_du(sel):
+        return delta_u[sel] if delta_u is not None else None
+
+    def _sel_dv(sel):
+        return delta_v[sel] if delta_v is not None else None
+
     depth_bins = {}
     for i, label in enumerate(DEPTH_BIN_LABELS):
         sel = depth_idx == i
-        depth_bins[label] = _bin_stats(label, errors[sel], matched[sel] if matched is not None else None)
+        depth_bins[label] = _bin_stats(label, errors[sel], matched[sel] if matched is not None else None,
+                                        _sel_du(sel), _sel_dv(sel))
 
     horizontal = {}
     for i, label in enumerate(HORIZONTAL_REGIONS):
         sel = h_idx == i
-        horizontal[label] = _bin_stats(label, errors[sel], matched[sel] if matched is not None else None)
+        horizontal[label] = _bin_stats(label, errors[sel], matched[sel] if matched is not None else None,
+                                        _sel_du(sel), _sel_dv(sel))
 
     vertical = {}
     for i, label in enumerate(VERTICAL_REGIONS):
         sel = v_idx == i
-        vertical[label] = _bin_stats(label, errors[sel], matched[sel] if matched is not None else None)
+        vertical[label] = _bin_stats(label, errors[sel], matched[sel] if matched is not None else None,
+                                      _sel_du(sel), _sel_dv(sel))
 
     return SpatialAnalysisResult(depth_bins=depth_bins, horizontal=horizontal, vertical=vertical)

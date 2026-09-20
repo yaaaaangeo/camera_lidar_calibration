@@ -1,0 +1,11 @@
+frame,auto_board_like,manual_board_like,auto_circles,manual_circles,auto_full_target,manual_full_target,roi_case
+407,0,,0,,0,,NO_MANUAL_ROI
+519,1,,1,,0,,NO_MANUAL_ROI
+548,1,,2,,0,,NO_MANUAL_ROI
+400,0,,0,,0,,NO_MANUAL_ROI
+260,0,,4,,1,,NO_MANUAL_ROI
+267,0,,3,,0,,NO_MANUAL_ROI
+274,0,,6,,0,,NO_MANUAL_ROI
+0,0,,2,,0,,NO_MANUAL_ROI
+28,0,,1,,0,,NO_MANUAL_ROI
+653,0,,2,,0,,NO_MANUAL_ROI

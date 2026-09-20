@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import cv2
 import numpy as np
+import pytest
 
 from gui.core.evaluation.edge_alignment import (
+    MATCH_RATE_THRESHOLDS_PX,
     EdgeAlignmentParams,
+    aggregate_point_stats,
     evaluate_edge_alignment,
     extract_image_edges,
     extract_lidar_edge_points,
@@ -145,3 +148,108 @@ def test_evaluate_edge_alignment_fails_on_blank_image():
     blank = np.zeros((480, 640, 3), dtype=np.uint8)
     result = evaluate_edge_alignment(blank, pixels, depths, EdgeAlignmentParams(depth_jump_threshold_m=1.0))
     assert not result.ok
+
+
+# ---------------------------------------------------- matched-only / penalty split
+#
+# aggregate_point_stats is tested directly, on hand-built (errors_px, matched)
+# arrays, rather than through a real scene -- the claims here are pure
+# arithmetic (does the 15px penalty leak into the matched-only family, is the
+# threshold sweep monotonic, does sign survive) and do not need real geometry
+# or Canny detection to hold or fail.
+
+
+def test_matched_only_mean_never_includes_the_unmatched_penalty():
+    # 3 matched points, real distances (well under the 15px penalty), and 2
+    # unmatched points already sitting at the 15px penalty value -- exactly
+    # the shape find_correspondences/apply_local_consistency_filter produce.
+    errors = np.array([1.0, 2.0, 3.0, 15.0, 15.0])
+    matched = np.array([True, True, True, False, False])
+    agg = aggregate_point_stats(errors, matched)
+
+    assert agg["matched_mean_px"] == pytest.approx(2.0)          # mean(1,2,3), 15px never enters
+    assert agg["matched_median_px"] == pytest.approx(2.0)
+    assert agg["matched_max_px"] == pytest.approx(3.0)           # never 15 -- that would mean the penalty leaked in
+    # The penalty-inclusive family (computed the old way, over every point)
+    # is a different number, and must actually differ here to prove the two
+    # are not silently the same computation under different names.
+    assert float(np.mean(errors)) == pytest.approx(7.2)
+    assert float(np.mean(errors)) != agg["matched_mean_px"]
+
+
+def test_matched_only_stats_are_nan_when_nothing_matched():
+    errors = np.full(4, 15.0)
+    matched = np.zeros(4, dtype=bool)
+    agg = aggregate_point_stats(errors, matched)
+    for key in ("matched_mean_px", "matched_median_px", "matched_p95_px", "matched_p99_px", "matched_max_px"):
+        assert np.isnan(agg[key]), key
+
+
+def test_p95_and_max_pin_to_the_penalty_when_over_a_third_unmatched():
+    """The exact mechanism behind the real-world "P95 == Max == 15.00"
+    symptom: once the unmatched fraction exceeds 5%, the 95th percentile of
+    the *penalty-inclusive* array sits inside the block of points already
+    pinned to the penalty value -- this is a guaranteed consequence of the
+    metric's construction, not a separate "worst 5%" measurement. Kept in
+    this module (not just re-derived by hand in the analysis) because it is
+    exactly the claim evaluate_edge_alignment's own docstring makes."""
+    matched_errors = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]      # 6 real, low-error matches
+    unmatched_errors = [15.0] * 6                          # 6 unmatched, 50% of 12
+    errors = np.array(matched_errors + unmatched_errors)
+    p95 = float(np.percentile(errors, 95))
+    assert p95 == pytest.approx(15.0)
+    assert float(np.max(errors)) == pytest.approx(15.0)
+
+
+def test_match_rate_by_threshold_is_monotonic_and_15px_equals_match_rate():
+    errors = np.array([1.0, 4.0, 4.5, 9.0, 14.0, 15.0, 15.0])
+    matched = np.array([True, True, True, True, True, False, False])
+    agg = aggregate_point_stats(errors, matched)
+    rates = [agg["match_rate_by_threshold_px"][th] for th in MATCH_RATE_THRESHOLDS_PX]
+    assert rates == sorted(rates)  # 2px <= 3px <= 5px <= 10px <= 15px, non-decreasing
+    n_matched = int(matched.sum())
+    n_total = len(errors)
+    # Nothing can match past the largest search radius, so "within 15px" must
+    # equal the ordinary match rate exactly.
+    assert agg["match_rate_by_threshold_px"][15.0] == pytest.approx(n_matched / n_total)
+
+
+def test_signed_delta_u_v_mean_keeps_sign_not_just_magnitude():
+    # 3 matched points: candidate consistently projects 4px to the right (+u)
+    # and 2px up (-v) of where the image edge actually is -- a systematic
+    # bias an unsigned distance could never reveal (it would report ~4.5px
+    # for both a +4 and a -4 case alike).
+    errors = np.array([4.47, 4.47, 4.47, 15.0])
+    matched = np.array([True, True, True, False])
+    delta_u = np.array([4.0, 4.0, 4.0, np.nan])
+    delta_v = np.array([-2.0, -2.0, -2.0, np.nan])
+    agg = aggregate_point_stats(errors, matched, delta_u, delta_v)
+
+    assert agg["mean_delta_u_px"] == pytest.approx(4.0)
+    assert agg["median_delta_u_px"] == pytest.approx(4.0)
+    assert agg["mean_delta_v_px"] == pytest.approx(-2.0)
+    assert agg["median_delta_v_px"] == pytest.approx(-2.0)
+
+
+def test_evaluate_edge_alignment_populates_matched_only_and_delta_fields():
+    """End-to-end (real geometry, not hand-built arrays): the new fields
+    actually reach EdgeAlignmentResult, stay internally consistent with the
+    existing penalty-inclusive ones, and the per-point delta arrays line up
+    1:1 with edge_matched (NaN exactly where, and only where, unmatched)."""
+    image, pixels, depths = _make_step_scene()
+    result = evaluate_edge_alignment(image, pixels, depths, EdgeAlignmentParams(depth_jump_threshold_m=1.0))
+    assert result.ok, result.reason
+    assert result.n_matched > 0  # otherwise this scene proves nothing about matched-only stats
+
+    assert np.isfinite(result.matched_mean_px)
+    assert result.matched_max_px <= result.max_px + 1e-9  # matched-only can never exceed the penalised max
+    assert result.matched_mean_px != pytest.approx(result.mean_px) or result.n_unmatched == 0
+
+    assert result.edge_delta_u_px.shape == (result.n_edge_points,)
+    assert result.edge_delta_v_px.shape == (result.n_edge_points,)
+    assert np.array_equal(np.isnan(result.edge_delta_u_px), ~result.edge_matched)
+    assert np.array_equal(np.isnan(result.edge_delta_v_px), ~result.edge_matched)
+
+    assert set(result.match_rate_by_threshold_px) == set(MATCH_RATE_THRESHOLDS_PX)
+    assert result.match_rate_by_threshold_px[15.0] == pytest.approx(result.match_rate)
+

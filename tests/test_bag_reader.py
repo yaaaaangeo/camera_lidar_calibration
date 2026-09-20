@@ -7,7 +7,36 @@ and keeps this test free of PySide6/rosbags entirely.
 
 from __future__ import annotations
 
-from gui.core.bag_reader import BagSource, pick_camera_for_frame
+from gui.core.bag_reader import BagSignature, BagSource, path_size_bytes, pick_camera_for_frame
+
+
+def test_path_size_bytes_single_file(tmp_path):
+    f = tmp_path / "x.bag"
+    f.write_bytes(b"0123456789")
+    assert path_size_bytes(f) == 10
+
+
+def test_path_size_bytes_ros2_directory_sums_every_file(tmp_path):
+    d = tmp_path / "bagdir"
+    d.mkdir()
+    (d / "metadata.yaml").write_bytes(b"abc")
+    (d / "data.db3").write_bytes(b"abcdef")
+    assert path_size_bytes(d) == 3 + 6
+
+
+def test_path_size_bytes_missing_path_is_zero(tmp_path):
+    assert path_size_bytes(tmp_path / "does_not_exist.bag") == 0
+
+
+def test_bag_signature_is_a_plain_comparable_dataclass():
+    """No I/O of its own -- just a data holder built from numbers the caller
+    already has. See gui.core.evaluation.holdout.signatures_suspiciously_similar
+    for the (heuristic) comparison logic."""
+    a = BagSignature(file_size_bytes=100, duration_s=1.0, n_topics=2,
+                      total_message_count=10, first_lidar_timestamp_ns=0, last_lidar_timestamp_ns=1)
+    b = BagSignature(file_size_bytes=100, duration_s=1.0, n_topics=2,
+                      total_message_count=10, first_lidar_timestamp_ns=0, last_lidar_timestamp_ns=1)
+    assert a == b
 
 
 def test_bagsource_keeps_its_full_public_interface():

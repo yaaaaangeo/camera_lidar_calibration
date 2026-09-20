@@ -59,6 +59,59 @@ class BagInfo:
         return [t for t in self.topics if t.kind == kind]
 
 
+@dataclass(frozen=True)
+class BagSignature:
+    """A lightweight fingerprint of a bag -- cheap enough to build entirely
+    from numbers already at hand once it is opened (file size, `inspect`'s
+    index-only topic/message counts, and a LiDAR topic's already-cached
+    first/last timestamp). Just enough to flag an accidental copy of the same
+    recording ('run1.bag' vs 'run1_copy.bag') picked as a supposedly separate
+    Hold-out bag -- never a cryptographic hash over the file contents, and
+    never proof of identity or difference on its own. See
+    `gui.core.evaluation.holdout.signatures_suspiciously_similar`, the only
+    thing that compares two of these, for how (heuristically) it is used.
+    """
+
+    file_size_bytes: int
+    duration_s: float
+    n_topics: int
+    total_message_count: int
+    first_lidar_timestamp_ns: int
+    last_lidar_timestamp_ns: int
+
+
+def path_size_bytes(path: str | Path) -> int:
+    """Total bytes on disk for a bag -- a single file for ROS1, or every
+    file under the folder for a ROS2 bag (metadata.yaml + .db3/.mcap)."""
+    p = Path(path)
+    if not p.exists():
+        return 0
+    if p.is_dir():
+        return sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+    return p.stat().st_size
+
+
+def _inclusive_start(t_ns: int) -> int:
+    """`rosbags`' ROS2 (SQLite/DirectoryReader) backend filters `start=` as a
+    strictly-greater-than bound, not >= -- a message whose own timestamp
+    equals `start` exactly is silently skipped. The ROS1 backend does not
+    have this quirk. Every `BagSource` method that promises an inclusive
+    lower bound (`first_after`'s "at or after", `range`'s "window") goes
+    through this helper so that promise holds on both backends, instead of
+    only on whichever one happened to be tested.
+
+    Concretely: `sample_frame_indices` -> a Scene's own captured `t_ns` ->
+    `accumulate_cloud(..., frames=1)` builds a single-nanosecond query window
+    `[t_ns, t_ns + 1)` around that exact stamp. On a ROS2 bag this silently
+    returned zero messages -- and therefore zero points, with no error --
+    for every single-frame scene, because the one message that could satisfy
+    `start=t_ns` was the one being excluded by the off-by-one. Subtracting
+    1ns costs nothing (real sensor messages are never nanoseconds apart) and
+    makes `start_ns` genuinely inclusive on both backends.
+    """
+    return t_ns - 1
+
+
 class BagSource:
     """A bag held open for repeated reads.
 
@@ -148,7 +201,9 @@ class BagSource:
     def first_after(self, topic: str, t_ns: int):
         """(timestamp, deserialised message) for the first message at or after t_ns."""
         self.open()
-        for conn, stamp, raw in self._reader.messages(connections=self._connections(topic), start=t_ns):
+        for conn, stamp, raw in self._reader.messages(
+            connections=self._connections(topic), start=_inclusive_start(t_ns)
+        ):
             return stamp, self._reader.deserialize(raw, conn.msgtype)
         return None, None
 
@@ -159,7 +214,7 @@ class BagSource:
         best_dt = None
         conns = self._connections(topic)
         for conn, stamp, raw in self._reader.messages(
-            connections=conns, start=t_ns - window_ns, stop=t_ns + window_ns
+            connections=conns, start=_inclusive_start(t_ns - window_ns), stop=t_ns + window_ns
         ):
             dt = abs(stamp - t_ns)
             if best_dt is None or dt < best_dt:
@@ -170,7 +225,7 @@ class BagSource:
         """Yield (timestamp, message) over a time window -- used for accumulation."""
         self.open()
         for conn, stamp, raw in self._reader.messages(
-            connections=self._connections(topic), start=start_ns, stop=stop_ns
+            connections=self._connections(topic), start=_inclusive_start(start_ns), stop=stop_ns
         ):
             yield stamp, self._reader.deserialize(raw, conn.msgtype)
 
