@@ -238,6 +238,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if row < 0:
             return
         page = self.pages[row]
+
         self.stack.setCurrentIndex(row)
         self.header.setText(f"{page.title} — {page.subtitle}" if page.subtitle else page.title)
         page.on_enter()

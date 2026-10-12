@@ -572,7 +572,14 @@ class FilterStep(StepPage):
         left_box.setFixedWidth(400)
 
         # --- 3D --------------------------------------------------------------
-        self.view = CloudView()
+        # Do not construct QOpenGLWidget while the application is opening on
+        # the 2D data page.  Qt 6.6/GLX on some Jetson X11 desktops composites
+        # the newly-created (but parent-hidden) black GL surface over the whole
+        # main window.  The real CloudView is installed on first entry to this
+        # step by _ensure_view().
+        self.view: CloudView | None = None
+        self._view_placeholder = QtWidgets.QLabel("3D 화면 준비 중…")
+        self._view_placeholder.setAlignment(QtCore.Qt.AlignCenter)
         self.colors = ColorControls()
         self.colors.changed.connect(lambda: self._draw())
         self.show_edges = QtWidgets.QCheckBox("검출 지점 표시")
@@ -602,7 +609,8 @@ class FilterStep(StepPage):
         right = QtWidgets.QVBoxLayout()
         right.addLayout(preset_bar)
         right.addWidget(self.colors)
-        right.addWidget(self.view, 1)
+        right.addWidget(self._view_placeholder, 1)
+        self._view_layout = right
 
         row = QtWidgets.QHBoxLayout(self)
         row.addWidget(left_box)
@@ -634,7 +642,20 @@ class FilterStep(StepPage):
 
     # ------------------------------------------------------------------ enter
 
+    def _ensure_view(self):
+        """Create the native OpenGL surface only when step 5 is opened."""
+        if self.view is not None:
+            return
+        view = CloudView()
+        index = self._view_layout.indexOf(self._view_placeholder)
+        self._view_layout.removeWidget(self._view_placeholder)
+        self._view_placeholder.hide()
+        self._view_placeholder.deleteLater()
+        self._view_layout.insertWidget(max(index, 0), view, 1)
+        self.view = view
+
     def on_enter(self):
+        self._ensure_view()
         p = self.project
         if not p.scenes:
             self._clear_view()
